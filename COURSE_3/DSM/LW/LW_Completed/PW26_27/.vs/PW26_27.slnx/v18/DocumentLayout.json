@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\Danik\\OneDrive\\Desktop\\UKRTB\\DPM\\\u0421#\\PW26_27\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{2580AEAF-7560-4F94-939F-7C4FBA6BA6B2}|PW26_27\\PW26_27.csproj|c:\\users\\danik\\onedrive\\desktop\\ukrtb\\dpm\\\u0441#\\pw26_27\\pw26_27\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{2580AEAF-7560-4F94-939F-7C4FBA6BA6B2}|PW26_27\\PW26_27.csproj|solutionrelative:pw26_27\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\Desktop\\UKRTB\\DPM\\\u0421#\\PW26_27\\PW26_27\\Program.cs",
+              "RelativeDocumentMoniker": "PW26_27\\Program.cs",
+              "ToolTip": "C:\\Users\\Danik\\OneDrive\\Desktop\\UKRTB\\DPM\\\u0421#\\PW26_27\\PW26_27\\Program.cs",
+              "RelativeToolTip": "PW26_27\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABcAAAAiAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-10-19T10:31:21.919Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

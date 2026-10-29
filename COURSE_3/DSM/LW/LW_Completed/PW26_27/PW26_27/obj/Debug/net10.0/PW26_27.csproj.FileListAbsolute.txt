@@ -1,0 +1,15 @@
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\bin\Debug\net10.0\PW26_27.exe
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\bin\Debug\net10.0\PW26_27.deps.json
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\bin\Debug\net10.0\PW26_27.runtimeconfig.json
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\bin\Debug\net10.0\PW26_27.dll
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\bin\Debug\net10.0\PW26_27.pdb
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.AssemblyInfoInputs.cache
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.AssemblyInfo.cs
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.csproj.CoreCompileInputs.cache
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.dll
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\refint\PW26_27.dll
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.pdb
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.genruntimeconfig.cache
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\ref\PW26_27.dll
+C:\Users\Danik\OneDrive\Desktop\UKRTB\DPM\С#\PW26_27\PW26_27\obj\Debug\net10.0\PW26_27.csproj.Up2Date
