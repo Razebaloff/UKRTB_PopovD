@@ -51,18 +51,18 @@ namespace LP_PopovD_App
             }
             if (Width < 1 || Height < 1)
                 return;
-            using Bitmap layer = new(Width * 2, Height * 2,
+            using Bitmap layer = new(Width, Height,
                 System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            layer.SetResolution(96, 96);
             using (Graphics detail = Graphics.FromImage(layer))
             {
-                detail.ScaleTransform(2, 2);
                 detail.SmoothingMode = SmoothingMode.AntiAlias;
                 detail.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 DrawButton(detail, hovered, pressed, Focused && ShowFocusCues);
             }
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.DrawImage(layer, ClientRectangle);
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            g.DrawImage(layer, ClientRectangle, 0, 0, layer.Width, layer.Height, GraphicsUnit.Pixel);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)

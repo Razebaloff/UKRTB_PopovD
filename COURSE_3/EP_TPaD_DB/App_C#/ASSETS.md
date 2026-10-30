@@ -17,7 +17,7 @@
 | Avangard.png | [КХЛ](https://www.khl.ru/images/teams/ru/1436/34) | 200 × 200 |
 | AkBars.png | [ХК «Салават Юлаев»: эмблема «Ак Барса»](https://hcsalavat.ru/upload/iblock/917/z1adg8vng70cpa6qr5q5sieojw5lzin2.png) | 200 × 200 |
 | HockeyStick.png | [PNGimg.com — Hockey Stick glossy, ID 26544](https://pngimg.com/image/26544), [PNG](https://pngimg.com/uploads/hockey/hockey_PNG102.png) | 1110 × 1110 |
-| IceFrame.png | Восстановление исходного фона проекта встроенным ImageGen; запрос в IceFrame.prompt.txt | 1672 × 941 |
+| IceFrame.png | Новая чистая ледяная фактура с сапфировой рамкой, встроенный ImageGen; полный запрос в IceFrame.prompt.txt | 1672 × 941 |
 
 Фотография клюшки: **PNGimg.com**, [CC BY-NC 4.0](https://pngimg.com/license).
 В приложении использованы две зеркальные копии исходного PNG с прозрачностью.

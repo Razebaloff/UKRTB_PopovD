@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
@@ -42,7 +43,13 @@ namespace LP_PopovD_App
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             if (ice != null)
-                g.DrawImage(ice, new Rectangle(Point.Empty, size));
+            {
+                // Средние тона приподняты: новая синяя фактура темнее прежней, но не скрывает эмблемы.
+                using ImageAttributes palette = new();
+                palette.SetGamma(0.55f, ColorAdjustType.Bitmap);
+                g.DrawImage(ice, new Rectangle(Point.Empty, size),
+                    0, 0, ice.Width, ice.Height, GraphicsUnit.Pixel, palette);
+            }
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             g.TranslateTransform(canvas.X, canvas.Y);
             g.ScaleTransform(canvas.Width / RinkDrawing.Width, canvas.Height / RinkDrawing.Height);

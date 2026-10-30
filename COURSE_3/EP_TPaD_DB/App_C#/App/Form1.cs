@@ -60,19 +60,18 @@ namespace LP_PopovD_App
 
             if (sceneCache == null)
             {
-                // Сглаживание применяется в окне, а не только к файлу экспорта.
-                sceneCache = new Bitmap(ClientSize.Width * 2, ClientSize.Height * 2);
+                // Один пиксель кэша соответствует пикселю окна: без увеличения и обратного размытия.
+                sceneCache = new Bitmap(ClientSize.Width, ClientSize.Height);
+                sceneCache.SetResolution(96, 96);
                 using Graphics g = Graphics.FromImage(sceneCache);
-                g.ScaleTransform(2, 2);
                 g.Clear(Color.FromArgb(225, 241, 250));
                 SceneDrawing.Draw(g, ClientSize, iceArtwork, menuOpened);
             }
             GraphicsState state = graphics.Save();
-            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size),
-                new Rectangle(sourceBounds.X * 2, sourceBounds.Y * 2,
-                    sourceBounds.Width * 2, sourceBounds.Height * 2), GraphicsUnit.Pixel);
+                sourceBounds, GraphicsUnit.Pixel);
             graphics.Restore(state);
         }
 
