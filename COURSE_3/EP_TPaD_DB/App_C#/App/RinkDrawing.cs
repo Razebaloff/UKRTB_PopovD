@@ -9,7 +9,7 @@ namespace LP_PopovD_App
         internal const float FaceoffRadius = 120;
         internal const float ButtonDiameter = 232;
         internal static readonly Color Blue = Color.FromArgb(19, 65, 118);
-        private static readonly Color Red = Color.FromArgb(204, 43, 62);
+        private static readonly Color Red = Color.FromArgb(220, 185, 37, 54);
 
         internal static readonly PointF[] MenuCenters =
         {
@@ -18,8 +18,8 @@ namespace LP_PopovD_App
 
         internal static RectangleF GetCanvasBounds(Size clientSize)
         {
-            float horizontal = Math.Clamp(clientSize.Width * 0.055f, 20, 90);
-            float vertical = Math.Clamp(clientSize.Height * 0.065f, 20, 70);
+            float horizontal = Math.Max(clientSize.Width * 0.055f, 20);
+            float vertical = Math.Max(clientSize.Height * 0.065f, 20);
             float scale = Math.Min(Math.Max(1, clientSize.Width - horizontal * 2) / Width,
                 Math.Max(1, clientSize.Height - vertical * 2) / Height);
             float width = Width * scale;
@@ -44,13 +44,10 @@ namespace LP_PopovD_App
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using Pen red = new(Red, 4.2f);
-            using Pen blueLine = new(Color.FromArgb(30, 105, 177), 12);
+            using Pen blueLine = new(Color.FromArgb(215, 30, 105, 177), 12);
             using SolidBrush ice = new(Color.FromArgb(38, 225, 243, 252));
             using GraphicsPath rink = RoundedRectangle(new RectangleF(28, 28, 1544, 744), 128);
             g.FillPath(ice, rink);
-            GraphicsState clip = g.Save();
-            g.SetClip(rink);
-
             // Следы лезвий и снежная крошка уже входят в фактуру фонового изображения.
 
             g.DrawLine(blueLine, 600, 28, 600, 772);
@@ -109,11 +106,39 @@ namespace LP_PopovD_App
             RinkTypography.Draw(g, "ТЕРРИТОРИЯ\nХОККЕЯ",
                 new RectangleF(684, 284, 232, 232), Blue);
 
-            g.Restore(clip);
+            DrawIceWear(g);
             using Pen frostEdge = new(Color.FromArgb(150, 244, 253, 255), 7);
             using Pen board = new(Color.FromArgb(135, 42, 95, 132), 2.5f);
             g.DrawPath(frostEdge, rink);
             g.DrawPath(board, rink);
+        }
+
+        private static bool InsideRink(float x, float y)
+        {
+            if (x < 28 || x > 1572 || y < 28 || y > 772)
+                return false;
+            float dx = x - Math.Clamp(x, 156, 1444);
+            float dy = y - Math.Clamp(y, 156, 644);
+            return dx * dx + dy * dy <= 128 * 128;
+        }
+
+        // Тонкие прорези поверх краски создают впечатление разметки под слоем льда.
+        private static void DrawIceWear(Graphics g)
+        {
+            Random random = new(81021);
+            using Pen scratch = new(Color.FromArgb(42, 239, 250, 255), 0.65f);
+            for (int i = 0; i < 1100; i++)
+            {
+                float x = 30 + random.NextSingle() * 1540;
+                float y = 30 + random.NextSingle() * 740;
+                float length = 3 + random.NextSingle() * 23;
+                if (InsideRink(x, y) && InsideRink(x + length, y - length * 0.38f))
+                    g.DrawLine(scratch, x, y, x + length, y - length * 0.38f);
+            }
+            using Pen skate = new(Color.FromArgb(26, 245, 253, 255), 0.9f);
+            for (int i = 0; i < 38; i++)
+                g.DrawArc(skate, random.Next(160, 1120), random.Next(160, 460),
+                    random.Next(90, 310), random.Next(60, 180), random.Next(360), random.Next(30, 100));
         }
 
         private static void DrawGoalkeeperTrapezoid(Graphics g, Pen red, bool left)

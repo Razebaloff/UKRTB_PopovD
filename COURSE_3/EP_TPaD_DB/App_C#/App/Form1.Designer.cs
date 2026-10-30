@@ -23,6 +23,8 @@ namespace LP_PopovD_App
             informationButton = new RinkMenuButton();
             scheduleButton = new RinkMenuButton();
             entryButton = new PuckButton();
+            registrationButton = new PuckButton();
+            entryScheduleButton = new PuckButton();
             SuspendLayout();
             //
             // rentButton
@@ -71,6 +73,16 @@ namespace LP_PopovD_App
             entryButton.Name = "entryButton";
             entryButton.Size = new Size(460, 460);
             entryButton.TabIndex = 0;
+            entryButton.Text = "ВОЙТИ";
+            entryButton.AccessibleName = "Войти";
+            registrationButton.Name = "registrationButton";
+            registrationButton.Text = "ЗАРЕГИСТРИРОВАТЬСЯ";
+            registrationButton.AccessibleName = "Зарегистрироваться";
+            registrationButton.TabIndex = 1;
+            entryScheduleButton.Name = "entryScheduleButton";
+            entryScheduleButton.Text = "РАСПИСАНИЕ";
+            entryScheduleButton.AccessibleName = "Расписание";
+            entryScheduleButton.TabIndex = 2;
             //
             // Form1
             //
@@ -82,6 +94,8 @@ namespace LP_PopovD_App
             Controls.Add(informationButton);
             Controls.Add(scheduleButton);
             Controls.Add(entryButton);
+            Controls.Add(registrationButton);
+            Controls.Add(entryScheduleButton);
             MinimumSize = new Size(960, 600);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
@@ -95,6 +109,8 @@ namespace LP_PopovD_App
         private RinkMenuButton informationButton = null!;
         private RinkMenuButton scheduleButton = null!;
         private PuckButton entryButton = null!;
+        private PuckButton registrationButton = null!;
+        private PuckButton entryScheduleButton = null!;
     }
 }
 

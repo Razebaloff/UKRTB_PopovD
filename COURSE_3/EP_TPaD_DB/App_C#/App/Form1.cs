@@ -14,6 +14,8 @@ namespace LP_PopovD_App
         {
             InitializeComponent();
             entryButton.Click += OpenMenu;
+            registrationButton.Click += OpenMenu;
+            entryScheduleButton.Click += OpenMenu;
             AcceptButton = entryButton;
             DoubleBuffered = true;
             KeyPreview = true;
@@ -67,18 +69,7 @@ namespace LP_PopovD_App
                 sceneCache = new Bitmap(ClientSize.Width, ClientSize.Height);
                 using Graphics g = Graphics.FromImage(sceneCache);
                 g.Clear(Color.FromArgb(225, 241, 250));
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                if (iceArtwork != null)
-                    g.DrawImage(iceArtwork, ClientRectangle);
-
-                RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
-                g.TranslateTransform(canvas.X, canvas.Y);
-                g.ScaleTransform(canvas.Width / RinkDrawing.Width,
-                    canvas.Height / RinkDrawing.Height);
-                if (menuOpened)
-                    RinkDrawing.Draw(g);
-                else
-                    EntryDrawing.Draw(g);
+                SceneDrawing.Draw(g, ClientSize, iceArtwork, menuOpened);
             }
             graphics.DrawImage(sceneCache,
                 new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
@@ -102,9 +93,14 @@ namespace LP_PopovD_App
             RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
             float scale = canvas.Width / RinkDrawing.Width;
             float puckSize = EntryDrawing.PuckDiameter * scale;
-            entryButton.Bounds = Rectangle.Round(new RectangleF(
-                (ClientSize.Width - puckSize) / 2, (ClientSize.Height - puckSize) / 2,
-                puckSize, puckSize));
+            PuckButton[] entryButtons = { entryButton, registrationButton, entryScheduleButton };
+            for (int i = 0; i < entryButtons.Length; i++)
+            {
+                PointF center = EntryDrawing.PuckCenters[i];
+                entryButtons[i].Bounds = Rectangle.Round(new RectangleF(
+                    canvas.X + center.X * scale - puckSize / 2,
+                    canvas.Y + center.Y * scale - puckSize / 2, puckSize, puckSize));
+            }
             Button[] buttons = { rentButton, profileButton, informationButton, scheduleButton };
             for (int i = 0; i < buttons.Length; i++)
             {
@@ -123,12 +119,15 @@ namespace LP_PopovD_App
                 return;
             menuOpened = true;
             ClearSceneCache();
-            entryButton.Visible = false;
+            entryButton.Visible = registrationButton.Visible = entryScheduleButton.Visible = false;
             AcceptButton = null;
             rentButton.Visible = profileButton.Visible =
                 informationButton.Visible = scheduleButton.Visible = true;
             Invalidate(true);
-            rentButton.Focus();
+            if (sender == entryScheduleButton)
+                scheduleButton.Focus();
+            else
+                rentButton.Focus();
         }
 
         private void SetFullScreen(bool enabled)
