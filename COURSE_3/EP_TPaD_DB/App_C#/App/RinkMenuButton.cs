@@ -49,8 +49,20 @@ namespace LP_PopovD_App
                 using SolidBrush background = new(Parent?.BackColor ?? Color.FromArgb(225, 241, 250));
                 g.FillRectangle(background, ClientRectangle);
             }
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            DrawButton(g, hovered, pressed, Focused && ShowFocusCues);
+            if (Width < 1 || Height < 1)
+                return;
+            using Bitmap layer = new(Width * 2, Height * 2,
+                System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            using (Graphics detail = Graphics.FromImage(layer))
+            {
+                detail.ScaleTransform(2, 2);
+                detail.SmoothingMode = SmoothingMode.AntiAlias;
+                detail.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                DrawButton(detail, hovered, pressed, Focused && ShowFocusCues);
+            }
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            g.DrawImage(layer, ClientRectangle);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)

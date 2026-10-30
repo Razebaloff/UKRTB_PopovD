@@ -20,13 +20,7 @@ namespace LP_PopovD_App
             DoubleBuffered = true;
             KeyPreview = true;
             SetStyle(ControlStyles.ResizeRedraw, true);
-            using Stream? stream = typeof(Form1).Assembly
-                .GetManifestResourceStream("LP_PopovD_App.IceFrame.jpg");
-            if (stream != null)
-            {
-                using Image image = Image.FromStream(stream);
-                iceArtwork = new Bitmap(image);
-            }
+            iceArtwork = new Bitmap(ArtworkResources.Get("IceFrame"));
             ClearSceneCache();
             LayoutMenuButtons();
         }
@@ -66,13 +60,20 @@ namespace LP_PopovD_App
 
             if (sceneCache == null)
             {
-                sceneCache = new Bitmap(ClientSize.Width, ClientSize.Height);
+                // Сглаживание применяется в окне, а не только к файлу экспорта.
+                sceneCache = new Bitmap(ClientSize.Width * 2, ClientSize.Height * 2);
                 using Graphics g = Graphics.FromImage(sceneCache);
+                g.ScaleTransform(2, 2);
                 g.Clear(Color.FromArgb(225, 241, 250));
                 SceneDrawing.Draw(g, ClientSize, iceArtwork, menuOpened);
             }
-            graphics.DrawImage(sceneCache,
-                new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
+            GraphicsState state = graphics.Save();
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size),
+                new Rectangle(sourceBounds.X * 2, sourceBounds.Y * 2,
+                    sourceBounds.Width * 2, sourceBounds.Height * 2), GraphicsUnit.Pixel);
+            graphics.Restore(state);
         }
 
         private void ClearSceneCache()

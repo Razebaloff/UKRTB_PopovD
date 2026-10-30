@@ -6,10 +6,17 @@ namespace LP_PopovD_App
     {
         internal static void Draw(Graphics g)
         {
+            // Эмблемы и флаги лежат на одной горизонтальной оси (Y = 60).
+            string[] left = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
+            string[] right = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
+            for (int i = 0; i < left.Length; i++)
+            {
+                DrawClub(g, left[i], 112 + i * 110);
+                DrawClub(g, right[i], 1048 + i * 110);
+            }
             DrawFlag(g, new RectangleF(632, 28, 106, 64), true);
             DrawFlag(g, new RectangleF(862, 28, 106, 64), false);
-            DrawStick(g, false);
-            DrawStick(g, true);
+            DrawSticks(g);
             using Font title = new("Segoe UI", 42, FontStyle.Bold, GraphicsUnit.Pixel);
             using StringFormat format = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             using SolidBrush halo = new(Color.FromArgb(200, 239, 250, 255));
@@ -55,28 +62,42 @@ namespace LP_PopovD_App
             g.DrawRectangle(border, r.X, r.Y, r.Width, r.Height);
         }
 
-        private static void DrawStick(Graphics g, bool mirrored)
+        private static void DrawClub(Graphics g, string name, float centerX)
         {
+            RectangleF plate = new(centerX - 45, 15, 90, 90);
+            using SolidBrush shadow = new(Color.FromArgb(28, 15, 51, 77));
+            using SolidBrush frost = new(Color.FromArgb(236, 250, 253, 255));
+            using Pen border = new(Color.FromArgb(150, 148, 181, 202), 0.8f);
+            g.FillEllipse(shadow, plate.X + 1, plate.Y + 3, plate.Width, plate.Height);
+            g.FillEllipse(frost, plate);
+            g.DrawEllipse(border, plate);
             GraphicsState state = g.Save();
-            if (mirrored) { g.TranslateTransform(1600, 0); g.ScaleTransform(-1, 1); }
-            // Рукоятка сверху, перо снизу; пересекаются именно нижние перья.
-            using Pen shaft = new(Color.FromArgb(30, 42, 52), 5) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen edge = new(Color.FromArgb(137, 158, 171), 1);
-            g.DrawLine(shaft, 774, 22, 808, 91);
-            g.DrawLine(edge, 772.7f, 22, 806.7f, 91);
-            using Pen tape = new(Color.FromArgb(224, 233, 239), 1.5f);
-            for (int i = 0; i < 6; i++)
-            {
-                float y = 26 + i * 2.8f, x = 774 + (y - 22) * 34 / 69;
-                g.DrawLine(tape, x - 2, y + 1, x + 2, y - 1);
-            }
-            using GraphicsPath blade = new();
-            blade.AddPolygon(new[] { new PointF(806, 86), new PointF(813, 94),
-                new PointF(783, 108), new PointF(777, 107), new PointF(776, 101) });
-            using SolidBrush rubber = new(Color.FromArgb(23, 34, 43));
-            g.FillPath(rubber, blade);
-            g.DrawPath(edge, blade);
+            using GraphicsPath clip = new();
+            clip.AddEllipse(plate.X + 4, plate.Y + 4, plate.Width - 8, plate.Height - 8);
+            g.SetClip(clip, CombineMode.Intersect);
+            DrawImageFit(g, ArtworkResources.Get(name), new RectangleF(centerX - 39, 21, 78, 78));
             g.Restore(state);
+        }
+
+        private static void DrawSticks(Graphics g)
+        {
+            // Готовая фотография настоящей клюшки. Отражённая пара соприкасается перьями снизу.
+            Image stick = ArtworkResources.Get("HockeyStick");
+            RectangleF bounds = new(750, 8, 100, 100);
+            DrawImageFit(g, stick, bounds);
+            GraphicsState state = g.Save();
+            g.TranslateTransform(1600, 0);
+            g.ScaleTransform(-1, 1);
+            DrawImageFit(g, stick, bounds);
+            g.Restore(state);
+        }
+
+        private static void DrawImageFit(Graphics g, Image image, RectangleF bounds)
+        {
+            float scale = Math.Min(bounds.Width / image.Width, bounds.Height / image.Height);
+            float width = image.Width * scale, height = image.Height * scale;
+            g.DrawImage(image, bounds.X + (bounds.Width - width) / 2,
+                bounds.Y + (bounds.Height - height) / 2, width, height);
         }
     }
 }

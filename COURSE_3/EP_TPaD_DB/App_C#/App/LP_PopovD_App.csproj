@@ -8,8 +8,8 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets\IceFrame.jpg">
-      <LogicalName>LP_PopovD_App.IceFrame.jpg</LogicalName>
+    <EmbeddedResource Include="Assets\*.png">
+      <LogicalName>LP_PopovD_App.Assets.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 </Project>
