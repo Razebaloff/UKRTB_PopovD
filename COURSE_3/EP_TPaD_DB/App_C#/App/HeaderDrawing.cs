@@ -17,7 +17,7 @@ namespace LP_PopovD_App
             DrawFlag(g, new RectangleF(632, 28, 106, 64), true);
             DrawFlag(g, new RectangleF(862, 28, 106, 64), false);
             DrawSticks(g);
-            using Font title = new("Segoe UI", 42, FontStyle.Bold, GraphicsUnit.Pixel);
+            using Font title = new(RinkTypography.FamilyName, 42, FontStyle.Bold, GraphicsUnit.Pixel);
             using StringFormat format = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             using SolidBrush halo = new(Color.FromArgb(200, 239, 250, 255));
             using SolidBrush ink = new(RinkDrawing.Blue);
@@ -64,19 +64,8 @@ namespace LP_PopovD_App
 
         private static void DrawClub(Graphics g, string name, float centerX)
         {
-            RectangleF plate = new(centerX - 45, 15, 90, 90);
-            using SolidBrush shadow = new(Color.FromArgb(28, 15, 51, 77));
-            using SolidBrush frost = new(Color.FromArgb(236, 250, 253, 255));
-            using Pen border = new(Color.FromArgb(150, 148, 181, 202), 0.8f);
-            g.FillEllipse(shadow, plate.X + 1, plate.Y + 3, plate.Width, plate.Height);
-            g.FillEllipse(frost, plate);
-            g.DrawEllipse(border, plate);
-            GraphicsState state = g.Save();
-            using GraphicsPath clip = new();
-            clip.AddEllipse(plate.X + 4, plate.Y + 4, plate.Width - 8, plate.Height - 8);
-            g.SetClip(clip, CombineMode.Intersect);
-            DrawImageFit(g, ArtworkResources.Get(name), new RectangleF(centerX - 39, 21, 78, 78));
-            g.Restore(state);
+            // Только сама эмблема: без подложки, круглой маски и пустых полей источника.
+            DrawImageFit(g, ArtworkResources.GetEmblem(name), new RectangleF(centerX - 44, 20, 88, 80));
         }
 
         private static void DrawSticks(Graphics g)
@@ -96,8 +85,9 @@ namespace LP_PopovD_App
         {
             float scale = Math.Min(bounds.Width / image.Width, bounds.Height / image.Height);
             float width = image.Width * scale, height = image.Height * scale;
-            g.DrawImage(image, bounds.X + (bounds.Width - width) / 2,
+            RectangleF destination = new(bounds.X + (bounds.Width - width) / 2,
                 bounds.Y + (bounds.Height - height) / 2, width, height);
+            g.DrawImage(image, destination, new RectangleF(0, 0, image.Width, image.Height), GraphicsUnit.Pixel);
         }
     }
 }

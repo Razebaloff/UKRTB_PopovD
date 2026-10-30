@@ -30,8 +30,8 @@ namespace LP_PopovD_App
 
         private static bool InsideFace(float x, float y)
         {
-            float dx = (x - 165) / 159;
-            float dy = (y - 158) / 154;
+            float dx = (x - 165) / 158;
+            float dy = (y - 165) / 158;
             return dx * dx + dy * dy < 1;
         }
 
@@ -42,22 +42,13 @@ namespace LP_PopovD_App
             g.TranslateTransform(bounds.X, bounds.Y);
             g.ScaleTransform(scale, scale);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            RectangleF body = new(3, 5, 324, 322);
+            RectangleF body = new(3, 3, 324, 324);
             using LinearGradientBrush rim = new(body, Color.FromArgb(64, 69, 74),
                 Color.FromArgb(3, 5, 7), 75f);
             g.FillEllipse(rim, body);
 
-            // Рифлёный резиновый торец под верхней рабочей поверхностью.
-            using Pen groove = new(Color.FromArgb(100, 97, 103, 109), 0.65f);
-            for (int x = 7; x < 325; x += 3)
-            {
-                float normalizedX = (x - 165f) / 162f;
-                float bottom = 166 + 161 * MathF.Sqrt(1 - normalizedX * normalizedX);
-                if (bottom > 250)
-                    g.DrawLine(groove, x, 250, x, bottom - 0.6f);
-            }
-
-            RectangleF face = new(5, 3, 320, 310);
+            // Вид сверху: концентрические окружности, без овального лица и смещённого торца.
+            RectangleF face = new(6, 6, 318, 318);
             using LinearGradientBrush rubber = new(face,
                 highlighted ? Color.FromArgb(44, 48, 53) : Color.FromArgb(31, 35, 39),
                 Color.FromArgb(5, 7, 9), 62f);
@@ -67,32 +58,18 @@ namespace LP_PopovD_App
             for (int i = 0; i < 4800; i++)
             {
                 float x = random.NextSingle() * 330;
-                float y = random.NextSingle() * 320;
+                float y = random.NextSingle() * 330;
                 float dot = 0.25f + random.NextSingle() * 0.5f;
                 if (InsideFace(x, y) && InsideFace(x + dot, y + dot))
                     g.FillEllipse(grain, x, y, dot, dot);
             }
-            using Pen scuff = new(Color.FromArgb(20, 166, 174, 181), 0.45f);
-            for (int i = 0; i < 85; i++)
-            {
-                float x = random.NextSingle() * 330;
-                float y = random.NextSingle() * 310;
-                float end = x + 2 + random.NextSingle() * 13;
-                if (InsideFace(x, y) && InsideFace(end, y - 2))
-                    g.DrawLine(scuff, x, y, end, y - 2);
-            }
-            using Pen bevel = new(highlighted ? Color.FromArgb(193, 211, 224) :
-                Color.FromArgb(115, 126, 135), 1.4f);
-            using Pen inner = new(Color.FromArgb(42, 174, 184, 193), 0.6f);
-            g.DrawArc(bevel, face, 188, 140);
-            g.DrawEllipse(inner, 9, 7, 312, 302);
             if (pressed)
             {
                 using SolidBrush shade = new(Color.FromArgb(38, 0, 0, 0));
                 g.FillEllipse(shade, face);
             }
             // Единая строка занимает почти всю ширину лица шайбы.
-            RinkTypography.Draw(g, text, new RectangleF(10, 3 + (pressed ? 2 : 0), 310, 310),
+            RinkTypography.Draw(g, text, new RectangleF(10, 10 + (pressed ? 2 : 0), 310, 310),
                 Color.White, outline: false);
             g.Restore(state);
         }

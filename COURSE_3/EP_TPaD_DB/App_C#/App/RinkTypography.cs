@@ -4,11 +4,13 @@ namespace LP_PopovD_App
 {
     internal static class RinkTypography
     {
+        internal const string FamilyName = "Arial";
+
         // Размер рассчитывается по реальным контурам букв, а не по фиксированному шрифту.
         internal static void Draw(Graphics g, string text, RectangleF circle, Color color, bool outline = true)
         {
             string[] lines = text.Replace("\r", "").Split('\n');
-            using FontFamily family = new("Segoe UI");
+            using FontFamily family = new(FamilyName);
             using StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone();
             format.FormatFlags |= StringFormatFlags.NoWrap;
             const float em = 100;
@@ -59,6 +61,9 @@ namespace LP_PopovD_App
                     g.DrawPath(halo, combined);
                 }
                 using SolidBrush ink = new(color);
+                // Небольшое утолщение с угловатыми стыками, без изменения пропорций букв.
+                using Pen weight = new(color, Math.Max(0.25f, scale * 0.8f)) { LineJoin = LineJoin.Miter };
+                g.DrawPath(weight, combined);
                 g.FillPath(ink, combined);
             }
             finally
