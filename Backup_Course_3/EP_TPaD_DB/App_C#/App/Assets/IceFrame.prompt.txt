@@ -1,0 +1,18 @@
+Source: built-in image generation (image_gen), edit workflow.
+Final asset: Assets/IceFrame.jpg (JPEG encoding for the desktop application).
+Input: Assets/IceFrame.jpg from repository commit f18768ef89ad712d19dd839cef2c368e9856928a.
+Precise rink markings and captions are drawn by C#.
+
+First edit prompt:
+Use case: precise-object-edit.
+Asset type: background texture for an existing C# desktop hockey menu, 16:9 landscape.
+Input image 1 is the edit target.
+Primary request: make the playing ice in the broad central open area look like a real indoor hockey rink photographed directly from overhead after a short skating session.
+Keep the perimeter composition: the existing sharp dark navy/sapphire ice ridges and small snow fragments along all four outer edges, including their positions and inward/upward pointing facets. Keep the large open center and the same light cool blue palette.
+Change the ice surface in the open center: translucent milky blue-white real ice with soft arena-light reflections, subtle mottled subsurface texture, many fine narrow skate blade grooves and gently curving skate arcs crossing at different angles. Add a restrained amount of loose shaved white ice/snow: a few thin uneven spray trails and scattered tiny powder clusters, slightly denser near the perimeter, very sparse in the central area reserved for captions. Groove edges catch soft white highlights with delicate blue-grey shadow. Believable shallow cuts, not deep cracks or broken glass. Natural irregularity, photographic material realism, moderate contrast, legible as a menu background.
+Strictly overhead flat camera, no perspective tilt. Preserve the wide composition and surrounding blue ridges. No players, skates, sticks, puck, people, boards, seats or arena scenery. No text, no logo, no watermark. Do not add rink markings, circles, red lines, blue lines, goals, buttons or other interface: all exact geometry and captions are drawn separately by the application.
+
+Material refinement prompt:
+Use case: precise-object-edit. Input image 1 is the edit target: a hockey menu background.
+Make one targeted material refinement to the broad central playing ice only. It must look like a photographed indoor hockey rink after light skating: mostly smooth satin milky blue-white ice, with extremely fine shallow skate-blade scratches and naturally curved intersecting skate arcs. Reduce the dense crystalline, embossed, glittery or shattered-looking surface texture throughout the open playing area. The body of the ice should remain calm and smooth over most of the area; tiny silver-grey grooves catch soft white highlights. A few very small loose white shaved-ice/snow deposits and short powder spray trails occupy only a small fraction of the open surface, with slightly more near the edges. Gentle diffuse overhead arena illumination; no strong circular light spots.
+Keep all dark blue sharp ice ridges and snow fragments at the extreme perimeter in their current positions and style; keep the overhead camera, landscape composition, light blue palette and open center. Preserve subtle photographic depth in the material. No frozen-lake cracks, deep fractures, heavy snow blanket, geometric mosaic, glitter or fake brush pattern in the central ice. No people, equipment, rink markings, circles, red/blue lines, goals, text, buttons, logos or watermark. Exact rink geometry is drawn later in C#.
