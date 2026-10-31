@@ -8,7 +8,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets\*.png">
+    <EmbeddedResource Include="Assets\*.png" Exclude="Assets\IceFrame.png">
       <LogicalName>LP_PopovD_App.Assets.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>

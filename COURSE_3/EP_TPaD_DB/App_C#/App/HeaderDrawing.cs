@@ -4,15 +4,16 @@ namespace LP_PopovD_App
 {
     internal static class HeaderDrawing
     {
+        internal static readonly string[] LeftClubs = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
+        internal static readonly string[] RightClubs = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
+
         internal static void Draw(Graphics g)
         {
             // Эмблемы и флаги лежат на одной горизонтальной оси (Y = 60).
-            string[] left = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
-            string[] right = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
-            for (int i = 0; i < left.Length; i++)
+            for (int i = 0; i < LeftClubs.Length; i++)
             {
-                DrawClub(g, left[i], 112 + i * 110);
-                DrawClub(g, right[i], 1048 + i * 110);
+                DrawClub(g, LeftClubs[i], 112 + i * 110);
+                DrawClub(g, RightClubs[i], 1048 + i * 110);
             }
             DrawFlag(g, new RectangleF(632, 28, 106, 64), true);
             DrawFlag(g, new RectangleF(862, 28, 106, 64), false);

@@ -5,6 +5,69 @@ namespace LP_PopovD_App
     internal static class RinkTypography
     {
         internal const string FamilyName = "Arial";
+        private static float sharedPuckRadius;
+
+        private static GraphicsPath PuckCaption(string text)
+        {
+            if (text == "ЗАРЕГИСТРИРОВАТЬСЯ") text = "ЗАРЕГИСТРИ-\nРОВАТЬСЯ";
+            string[] lines = text.Split('\n');
+            using FontFamily family = new(FamilyName);
+            using StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone();
+            format.FormatFlags |= StringFormatFlags.NoWrap;
+            List<GraphicsPath> parts = new();
+            try
+            {
+                float height = 0;
+                foreach (string line in lines)
+                {
+                    GraphicsPath part = new();
+                    part.AddString(line, family, (int)FontStyle.Bold, 100, PointF.Empty, format);
+                    parts.Add(part);
+                    height += part.GetBounds().Height;
+                }
+                height += (parts.Count - 1) * 12;
+                float top = -height / 2;
+                GraphicsPath result = new();
+                foreach (GraphicsPath part in parts)
+                {
+                    RectangleF b = part.GetBounds();
+                    using Matrix move = new();
+                    move.Translate(-b.X - b.Width / 2, top - b.Y);
+                    part.Transform(move);
+                    result.AddPath(part, false);
+                    top += b.Height + 12;
+                }
+                return result;
+            }
+            finally { foreach (GraphicsPath part in parts) part.Dispose(); }
+        }
+
+        internal static float PuckEmSize(float diameter)
+        {
+            if (sharedPuckRadius == 0)
+                foreach (string caption in EntryDrawing.Captions)
+                {
+                    using GraphicsPath path = PuckCaption(caption);
+                    path.Flatten(null, 0.05f);
+                    foreach (PointF point in path.PathPoints)
+                        sharedPuckRadius = Math.Max(sharedPuckRadius,
+                            MathF.Sqrt(point.X * point.X + point.Y * point.Y));
+                }
+            return 100 * diameter * 0.465f / sharedPuckRadius;
+        }
+
+        internal static void DrawPuckCaption(Graphics g, string text, RectangleF bounds)
+        {
+            using GraphicsPath path = PuckCaption(text);
+            float scale = PuckEmSize(Math.Min(bounds.Width, bounds.Height)) / 100;
+            using Matrix transform = new(scale, 0, 0, scale,
+                bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2);
+            path.Transform(transform);
+            using SolidBrush ink = new(Color.White);
+            using Pen weight = new(Color.White, Math.Max(0.25f, scale * 0.8f)) { LineJoin = LineJoin.Miter };
+            g.DrawPath(weight, path);
+            g.FillPath(ink, path);
+        }
 
         // Размер рассчитывается по реальным контурам букв, а не по фиксированному шрифту.
         internal static void Draw(Graphics g, string text, RectangleF circle, Color color, bool outline = true)

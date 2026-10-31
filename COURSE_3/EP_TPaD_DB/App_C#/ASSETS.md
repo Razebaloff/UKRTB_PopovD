@@ -17,7 +17,8 @@
 | Avangard.png | [КХЛ](https://www.khl.ru/images/teams/ru/1436/34) | 200 × 200 |
 | AkBars.png | [ХК «Салават Юлаев»: эмблема «Ак Барса»](https://hcsalavat.ru/upload/iblock/917/z1adg8vng70cpa6qr5q5sieojw5lzin2.png) | 200 × 200 |
 | HockeyStick.png | [PNGimg.com — Hockey Stick glossy, ID 26544](https://pngimg.com/image/26544), [PNG](https://pngimg.com/uploads/hockey/hockey_PNG102.png) | 1110 × 1110 |
-| IceFrame.png | Новая чистая ледяная фактура с сапфировой рамкой, встроенный ImageGen; полный запрос в IceFrame.prompt.txt | 1672 × 941 |
+| PuckSurface.png | Встроенный ImageGen, материал использованной хоккейной шайбы; полный запрос в PuckSurface.prompt.txt | 1254 × 1254 |
+| IceFrame.png | Архив прежнего фона ImageGen; не включён в сборку и не используется | 1672 × 941 |
 
 Фотография клюшки: **PNGimg.com**, [CC BY-NC 4.0](https://pngimg.com/license).
 В приложении использованы две зеркальные копии исходного PNG с прозрачностью.
@@ -25,3 +26,7 @@
 
 Некоторые эмблемы доступны только в небольшом растровом размере.
 Их увеличение не восстанавливает отсутствующие детали и не меняет подлинную эмблему.
+
+Текущий фон создаётся кодом NativeIceDrawing.cs в разрешении окна.
+Хоккейная майка, её ткань, швы и полосы рисуются JerseyDrawing.cs.
+Малые сколы кромки шайб строятся геометрией; фотографический материал покрывает всю рабочую поверхность.
