@@ -13,6 +13,11 @@ namespace LP_PopovD_App
         private static IceWorld? world;
         private static Size worldSize;
 
+        // Рост габаритов 40%. Высота острой вершины не превышает 1,35 / 0,92 ≈ 1,468
+        // прежней максимальной высоты глыбы, то есть остаётся в пределах 1,5 раза.
+        internal const float LumpScale = 1.40f;
+        internal const float LumpHeightScale = 1.35f;
+
         private readonly record struct Lump(float X, float Y, float Rx, float Ry,
             float Cos, float Sin, float Height, int Seed);
 
@@ -107,9 +112,9 @@ namespace LP_PopovD_App
                             float angle = (random.NextSingle() - .5f) * 1.1f + (edge < 2 ? 0 : MathF.PI / 2);
                             float x = edge switch { 0 or 1 => a, 2 => inward, _ => Width - inward };
                             float y = edge switch { 0 => inward, 1 => Height - inward, _ => a };
-                            Lumps.Add(new Lump(x, y, 23 + random.NextSingle() * 30,
-                                12 + random.NextSingle() * 17, MathF.Cos(angle), MathF.Sin(angle),
-                                (layer == 0 ? 7 : 4) + random.NextSingle() * 10, random.Next(1, 5000)));
+                            Lumps.Add(new Lump(x, y, (23 + random.NextSingle() * 30) * LumpScale,
+                                (12 + random.NextSingle() * 17) * LumpScale, MathF.Cos(angle), MathF.Sin(angle),
+                                ((layer == 0 ? 7 : 4) + random.NextSingle() * 10) * LumpHeightScale, random.Next(1, 5000)));
                         }
                     }
 
@@ -165,7 +170,7 @@ namespace LP_PopovD_App
             float g = 177 + cloud * 26 + texture - edge * 29;
             float b = 199 + cloud * 20 + texture - edge * 23;
 
-            if (distance < 105)
+            if (distance < 105 * LumpScale)
             {
                 int column = Math.Clamp((int)(x / IceWorld.CellSize), 0, scene.Columns - 1);
                 int row = Math.Clamp((int)(y / IceWorld.CellSize), 0, scene.Rows - 1);
@@ -177,8 +182,8 @@ namespace LP_PopovD_App
                     float u = (dx * lump.Cos + dy * lump.Sin) / lump.Rx;
                     float v = (-dx * lump.Sin + dy * lump.Cos) / lump.Ry;
                     float q = u * u + v * v;
-                    float su = ((dx - 4) * lump.Cos + (dy - 7) * lump.Sin) / (lump.Rx * 1.10f);
-                    float sv = (-(dx - 4) * lump.Sin + (dy - 7) * lump.Cos) / (lump.Ry * 1.10f);
+                    float su = ((dx - 4 * LumpHeightScale) * lump.Cos + (dy - 7 * LumpHeightScale) * lump.Sin) / (lump.Rx * 1.10f);
+                    float sv = (-(dx - 4 * LumpHeightScale) * lump.Sin + (dy - 7 * LumpHeightScale) * lump.Cos) / (lump.Ry * 1.10f);
                     shadow = Math.Max(shadow, Math.Clamp(1 - su * su - sv * sv, 0, 1) * .22f);
                     if (q >= 2.1f) continue;
                     float cut = 1 - Math.Abs(u), cutU = -Math.Sign(u), cutV = 0;
@@ -190,21 +195,30 @@ namespace LP_PopovD_App
                     diagonal = .85f * u - .53f * v;
                     candidate = 1.02f - Math.Abs(diagonal);
                     if (candidate < cut) { cut = candidate; cutU = -.85f * Math.Sign(diagonal); cutV = .53f * Math.Sign(diagonal); }
+                    // Дополнительный срез одного угла даёт разные естественные сколы.
+                    // Он только уменьшает исходный контур, не расширяя его сверх LumpScale.
+                    float chipU = (.68f + (lump.Seed & 7) / 7f * .20f) * ((lump.Seed & 64) == 0 ? 1 : -1);
+                    float chipV = (.40f + ((lump.Seed >> 3) & 7) / 7f * .12f) * ((lump.Seed & 128) == 0 ? 1 : -1);
+                    candidate = .94f + lump.Seed % 5 * .01f - chipU * u - chipV * v;
+                    if (candidate < cut) { cut = candidate; cutU = -chipU; cutV = -chipV; }
                     if (cut <= 0) continue;
                     overlap++;
-                    float bevelWidth = lump.Seed % 4 == 0 ? .42f : .19f;
+                    float bevelWidth = lump.Seed % 4 == 0 ? .20f : .085f;
                     float bevel = Math.Clamp(cut / bevelWidth, 0, 1), root = MathF.Sqrt(bevel);
                     float profile = root * .45f + bevel * .55f;
-                    float tiltU = ((lump.Seed & 15) / 15f - .5f) * .24f;
-                    float tiltV = (((lump.Seed >> 4) & 15) / 15f - .5f) * .24f;
-                    float crown = MathF.Sqrt(Math.Max(.08f, 1 - .45f * u * u - .45f * v * v));
-                    float roof = .67f + crown * .25f + tiltU * u + tiltV * v;
+                    // Смещённая вершина и сходящиеся плоскости вместо округлой макушки.
+                    float pu = u - ((lump.Seed & 15) / 15f - .5f) * .32f;
+                    float pv = v - (((lump.Seed >> 4) & 15) / 15f - .5f) * .28f;
+                    float ridge = .75f * pu + .66f * pv;
+                    float roof = Math.Clamp(1 - .32f * Math.Abs(pu) - .36f * Math.Abs(pv) - .12f * Math.Abs(ridge), .20f, 1);
+                    float roofU = roof <= .20f ? 0 : -.32f * Math.Sign(pu) - .09f * Math.Sign(ridge);
+                    float roofV = roof <= .20f ? 0 : -.36f * Math.Sign(pv) - .0792f * Math.Sign(ridge);
                     float z = lump.Height * profile * roof;
                     if (z <= height) continue;
                     height = z;
                     float slope = bevel < 1 ? (.225f / Math.Max(.035f, root) + .55f) / bevelWidth : 0;
-                    float du = lump.Height * (slope * cutU * roof + profile * (tiltU - .1125f * u / crown));
-                    float dv = lump.Height * (slope * cutV * roof + profile * (tiltV - .1125f * v / crown));
+                    float du = lump.Height * (slope * cutU * roof + profile * roofU);
+                    float dv = lump.Height * (slope * cutV * roof + profile * roofV);
                     nx = -(du * lump.Cos / lump.Rx - dv * lump.Sin / lump.Ry);
                     ny = -(du * lump.Sin / lump.Rx + dv * lump.Cos / lump.Ry);
                     float inverse = 1 / MathF.Sqrt(nx * nx + ny * ny + 1);
@@ -215,12 +229,13 @@ namespace LP_PopovD_App
                 {
                     float diffuse = Math.Max(0, -.44f * nx - .60f * ny + .67f * nz);
                     float half = Math.Max(0, -.24f * nx - .32f * ny + .916f * nz);
-                    float specular = MathF.Pow(half, 52) * 105;
+                    float specular = MathF.Pow(half, 36 + selectedSeed % 33) * 105;
                     float grazing = 1 - nz;
                     float reflection = grazing * grazing * (36 + grazing * 48);
                     float vein = Math.Abs(Noise(localU * 6 + selectedSeed, localV * 5) - .5f);
                     float milky = Math.Max(0, 1 - vein * 48) * (9 + frost * 10);
                     float hoar = Math.Max(0, Noise(x * 1.8f + selectedSeed, y * 1.8f) - .62f) * 52;
+                    specular *= 1 - Math.Clamp(hoar / 45, 0, .45f);
                     float inclusions = scene.Material.Sample(x + nx * height * 1.5f + selectedSeed,
                         y + ny * height * 1.5f) * 25;
                     float occlusion = Math.Min(15, Math.Max(0, overlap - 1) * 2.4f);
