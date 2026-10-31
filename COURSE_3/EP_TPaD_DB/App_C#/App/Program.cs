@@ -12,10 +12,12 @@ namespace LP_PopovD_App
                 {
                     try
                     {
-                        if (args.Length is < 2 or > 3 || !SceneExport.TryGetScreen(args[0], out AppScreen screen))
-                            throw new ArgumentException("Экспорт: --export-entry|--export-login|--export-registration|--export-menu файл.png [ширина].");
-                        int width = args.Length == 3 ? int.Parse(args[2]) : SceneExport.Width16K;
-                        SceneExport.Save(args[1], screen, width);
+                        if (args.Length is < 2 or > 3)
+                            throw new ArgumentException("Экспорт: --export-all папка [ширина] или --export-entry|--export-login|--export-registration|--export-menu файл.png [ширина].");
+                        int width = args.Length == 3 ? int.Parse(args[2]) : SceneExport.Width32K;
+                        if (args[0] == "--export-all") SceneExport.SaveAll(args[1], width);
+                        else if (SceneExport.TryGetScreen(args[0], out AppScreen screen)) SceneExport.Save(args[1], screen, width);
+                        else throw new ArgumentException("Неизвестная команда экспорта.");
                         return 0;
                     }
                     catch (Exception error)

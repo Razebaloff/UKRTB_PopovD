@@ -314,9 +314,9 @@ namespace LP_PopovD_App
             AppScreen exportScreen = screen;
             using SaveFileDialog dialog = new()
             {
-                Title = "Сохранить экран в 16K — 15360 × 8640",
+                Title = "Сохранить экран в 32K — 30720 × 17280",
                 Filter = "PNG без потерь (*.png)|*.png",
-                FileName = $"{exportScreen}_16K.png",
+                FileName = $"{exportScreen}_32K.png",
                 DefaultExt = "png",
                 AddExtension = true,
                 OverwritePrompt = true
@@ -324,7 +324,7 @@ namespace LP_PopovD_App
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
             exporting = true;
             string oldTitle = Text;
-            Text = "ТЕРРИТОРИЯ ХОККЕЯ — сохранение 16K…";
+            Text = "ТЕРРИТОРИЯ ХОККЕЯ — сохранение 32K…";
             try
             {
                 // Отдельный процесс сохраняет отзывчивость окна и не делит GDI-кэши с UI.
@@ -339,7 +339,7 @@ namespace LP_PopovD_App
                     start.ArgumentList.Add(typeof(Program).Assembly.Location);
                 start.ArgumentList.Add(SceneExport.Argument(exportScreen));
                 start.ArgumentList.Add(dialog.FileName);
-                start.ArgumentList.Add(SceneExport.Width16K.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                start.ArgumentList.Add(SceneExport.Width32K.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 using Process renderer = Process.Start(start) ?? throw new InvalidOperationException("Не удалось запустить экспорт.");
                 Task<string> errors = renderer.StandardError.ReadToEndAsync();
                 await renderer.WaitForExitAsync();
@@ -347,13 +347,13 @@ namespace LP_PopovD_App
                 if (renderer.ExitCode != 0)
                     throw new InvalidOperationException(string.IsNullOrWhiteSpace(details) ? "Процесс отрисовки завершился с ошибкой." : details.Trim());
                 if (!IsDisposed && !Disposing)
-                    MessageBox.Show(this, $"Сохранено: 15360 × 8640 пикселей.\n{dialog.FileName}",
-                        "Экспорт 16K", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(this, $"Сохранено: 30720 × 17280 пикселей.\n{dialog.FileName}",
+                        "Экспорт 32K", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception error)
             {
                 if (!IsDisposed && !Disposing)
-                    MessageBox.Show(this, error.Message, "Не удалось сохранить 16K", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(this, error.Message, "Не удалось сохранить 32K", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {

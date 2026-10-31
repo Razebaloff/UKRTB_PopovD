@@ -7,8 +7,9 @@ namespace LP_PopovD_App
         internal static readonly string[] LeftClubs = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
         internal static readonly string[] RightClubs = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
 
-        internal static void Draw(Graphics g)
+        internal static void Draw(Graphics g, RectangleF? viewport = null)
         {
+            if (viewport.HasValue && !viewport.Value.IntersectsWith(new RectangleF(0, 0, 1600, 185))) return;
             // Эмблемы и флаги лежат на одной горизонтальной оси (Y = 60).
             for (int i = 0; i < LeftClubs.Length; i++)
             {

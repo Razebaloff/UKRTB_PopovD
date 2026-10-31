@@ -45,9 +45,15 @@ namespace LP_PopovD_App
             return path;
         }
 
-        internal static void Draw(Graphics g, bool registration, bool includeControls, string status = "")
+        internal static void Draw(Graphics g, bool registration, bool includeControls, string status = "", RectangleF? viewport = null)
         {
-            HeaderDrawing.Draw(g);
+            HeaderDrawing.Draw(g, viewport);
+            if (viewport.HasValue && !viewport.Value.IntersectsWith(new RectangleF(345, 192, 915, 590)))
+            {
+                if (includeControls && viewport.Value.IntersectsWith(new RectangleF(49, 187, 180, 58)))
+                    DrawCapsule(g, BackBounds, "НАЗАД", false);
+                return;
+            }
             using GraphicsPath shirt = Shirt();
             using GraphicsPath shadow = (GraphicsPath)shirt.Clone();
             using (Matrix move = new()) { move.Translate(5, 12); shadow.Transform(move); }
@@ -70,8 +76,14 @@ namespace LP_PopovD_App
             g.DrawBezier(sleeveFold, 1136, 380, 1159, 468, 1194, 545, 1199, 616);
             using Pen knit = new(Color.FromArgb(14, 201, 222, 234), 0.6f);
             for (int y = 216; y < 760; y += 4)
+            {
+                if (viewport.HasValue && (y + 2 < viewport.Value.Top || y - 1 > viewport.Value.Bottom)) continue;
                 for (int x = 360 + (y % 8 == 0 ? 2 : 0); x < 1240; x += 6)
+                {
+                    if (viewport.HasValue && (x + 3 < viewport.Value.Left || x - 1 > viewport.Value.Right)) continue;
                     g.DrawLine(knit, x, y, x + 2, y + 1);
+                }
+            }
             using Pen fold = new(Color.FromArgb(44, 0, 9, 18), 12);
             using Pen foldLight = new(Color.FromArgb(22, 155, 200, 224), 7);
             g.DrawBezier(fold, 541, 445, 555, 530, 535, 629, 545, 748);

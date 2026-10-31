@@ -9,10 +9,12 @@ namespace LP_PopovD_App
         internal static readonly PointF[] PuckCenters = { new(400, 350), new(1200, 350), new(800, 605) };
         internal static readonly string[] Captions = { "ВОЙТИ", "ЗАРЕГИСТРИРОВАТЬСЯ", "РАСПИСАНИЕ" };
 
-        internal static void Draw(Graphics g)
+        internal static void Draw(Graphics g, RectangleF? viewport = null)
         {
-            HeaderDrawing.Draw(g);
+            HeaderDrawing.Draw(g, viewport);
             foreach (PointF center in PuckCenters)
+            {
+                if (viewport.HasValue && !viewport.Value.IntersectsWith(new RectangleF(center.X - 190, center.Y - 190, 380, 400))) continue;
                 for (int i = 5; i >= 0; i--)
                 {
                     float spread = 3 + i * 4;
@@ -20,6 +22,7 @@ namespace LP_PopovD_App
                     g.FillEllipse(shadow, center.X - 165 - spread, center.Y - 165 + 11 - spread / 2,
                         330 + spread * 2, 330 + spread);
                 }
+            }
         }
 
         private static PointF Polar(float angle, float radius)
