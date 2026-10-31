@@ -23,6 +23,7 @@ namespace LP_PopovD_App
         private readonly CapsuleButton backButton;
         private string authStatus = "";
         private bool scheduleFocus;
+        private bool exporting;
 
         public Form1()
         {
@@ -299,7 +300,66 @@ namespace LP_PopovD_App
                 SetFullScreen(!isFullScreen);
                 e.Handled = e.SuppressKeyPress = true;
             }
+            else if (e.KeyCode == Keys.F12)
+            {
+                ExportCurrentScreen();
+                e.Handled = e.SuppressKeyPress = true;
+            }
             base.OnKeyDown(e);
+        }
+
+        private async void ExportCurrentScreen()
+        {
+            if (exporting || transitionFrom != null) return;
+            AppScreen exportScreen = screen;
+            using SaveFileDialog dialog = new()
+            {
+                Title = "Сохранить экран в 16K — 15360 × 8640",
+                Filter = "PNG без потерь (*.png)|*.png",
+                FileName = $"{exportScreen}_16K.png",
+                DefaultExt = "png",
+                AddExtension = true,
+                OverwritePrompt = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            exporting = true;
+            string oldTitle = Text;
+            Text = "ТЕРРИТОРИЯ ХОККЕЯ — сохранение 16K…";
+            try
+            {
+                // Отдельный процесс сохраняет отзывчивость окна и не делит GDI-кэши с UI.
+                string executable = Environment.ProcessPath ?? throw new InvalidOperationException("Не найден путь приложения.");
+                ProcessStartInfo start = new(executable)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true
+                };
+                if (string.Equals(Path.GetFileNameWithoutExtension(executable), "dotnet", StringComparison.OrdinalIgnoreCase))
+                    start.ArgumentList.Add(typeof(Program).Assembly.Location);
+                start.ArgumentList.Add(SceneExport.Argument(exportScreen));
+                start.ArgumentList.Add(dialog.FileName);
+                start.ArgumentList.Add(SceneExport.Width16K.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                using Process renderer = Process.Start(start) ?? throw new InvalidOperationException("Не удалось запустить экспорт.");
+                Task<string> errors = renderer.StandardError.ReadToEndAsync();
+                await renderer.WaitForExitAsync();
+                string details = await errors;
+                if (renderer.ExitCode != 0)
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(details) ? "Процесс отрисовки завершился с ошибкой." : details.Trim());
+                if (!IsDisposed && !Disposing)
+                    MessageBox.Show(this, $"Сохранено: 15360 × 8640 пикселей.\n{dialog.FileName}",
+                        "Экспорт 16K", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception error)
+            {
+                if (!IsDisposed && !Disposing)
+                    MessageBox.Show(this, error.Message, "Не удалось сохранить 16K", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                exporting = false;
+                if (!IsDisposed && !Disposing) Text = oldTitle;
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
