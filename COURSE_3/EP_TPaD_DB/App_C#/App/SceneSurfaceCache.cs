@@ -8,7 +8,7 @@ namespace LP_PopovD_App
     internal sealed class SceneSurfaceCache : IDisposable
     {
         private static readonly object renderer = new();
-        private readonly Dictionary<SceneSurfaceKey, Task<Bitmap>> surfaces = new();
+        private readonly Dictionary<SceneSurfaceKey, Task<Bitmap?>> surfaces = new();
         internal Size Size { get; }
         private volatile bool disposed;
 
@@ -23,22 +23,28 @@ namespace LP_PopovD_App
             }
         }
 
-        internal Task<Bitmap> GetAsync(SceneSurfaceKey key)
+        internal Task<Bitmap?> GetAsync(SceneSurfaceKey key)
         {
-            if (disposed) throw new ObjectDisposedException(nameof(SceneSurfaceCache));
-            if (surfaces.TryGetValue(key, out Task<Bitmap>? task)) return task;
-            task = Task.Run(() =>
+            // Пересоздание окна — обычный исход подготовки, без исключений для отладчика.
+            if (disposed) return Task.FromResult<Bitmap?>(null);
+            if (surfaces.TryGetValue(key, out Task<Bitmap?>? task)) return task;
+            task = Task.Run<Bitmap?>(() =>
             {
                 lock (renderer)
                 {
-                    if (disposed) throw new OperationCanceledException();
+                    if (disposed) return null;
                     Bitmap image = new(Size.Width, Size.Height, PixelFormat.Format32bppPArgb);
                     image.SetResolution(96, 96);
                     try
                     {
-                        using Graphics g = Graphics.FromImage(image);
-                        SceneDrawing.Draw(g, Size, key.Screen, includeSticks: false,
-                            codeRequested: key.CodeRequested, authPanels: !key.CleanJersey);
+                        using (Graphics g = Graphics.FromImage(image))
+                            SceneDrawing.Draw(g, Size, key.Screen, includeSticks: false,
+                                codeRequested: key.CodeRequested, authPanels: !key.CleanJersey);
+                        if (disposed)
+                        {
+                            image.Dispose();
+                            return null;
+                        }
                         return image;
                     }
                     catch { image.Dispose(); throw; }
@@ -52,8 +58,8 @@ namespace LP_PopovD_App
         {
             if (disposed) return;
             disposed = true;
-            foreach (Task<Bitmap> task in surfaces.Values)
-                _ = task.ContinueWith(done => { if (done.Status == TaskStatus.RanToCompletion) done.Result.Dispose(); },
+            foreach (Task<Bitmap?> task in surfaces.Values)
+                _ = task.ContinueWith(done => { if (done.Status == TaskStatus.RanToCompletion) done.Result?.Dispose(); },
                     CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             surfaces.Clear();
         }

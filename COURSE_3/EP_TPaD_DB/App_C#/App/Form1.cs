@@ -111,7 +111,13 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if (loginInput == null || ClientSize.Width < 1 || ClientSize.Height < 1) return;
+            if (IsDisposed || Disposing || loginInput == null || ClientSize.Width < 1 || ClientSize.Height < 1) return;
+            if (surfaces?.Size == ClientSize)
+            {
+                LayoutSceneControls();
+                Invalidate(true);
+                return;
+            }
             CancelButtonAnimation();
             DropTransition();
             CancelLoginAnimation();
@@ -133,8 +139,8 @@ namespace LP_PopovD_App
             SceneSurfaceCache cache = surfaces;
             try
             {
-                Bitmap image = await cache.GetAsync(CurrentKey);
-                if (IsDisposed || Disposing || cache != surfaces) return;
+                Bitmap? image = await cache.GetAsync(CurrentKey);
+                if (image == null || IsDisposed || Disposing || cache != surfaces) return;
                 sceneCache = image;
                 loading = false;
                 RefreshInputFabric();
@@ -421,8 +427,8 @@ namespace LP_PopovD_App
             Bitmap? before = suppliedBefore;
             try
             {
-                Bitmap next = await cache.GetAsync(new(target));
-                if (cache != surfaces || IsDisposed || Disposing) return;
+                Bitmap? next = await cache.GetAsync(new(target));
+                if (next == null || cache != surfaces || IsDisposed || Disposing) return;
                 before ??= CaptureScreen();
                 HideScreenControls();
                 ClearValues();
@@ -487,8 +493,8 @@ namespace LP_PopovD_App
             SceneSurfaceCache cache = surfaces;
             try
             {
-                Bitmap image = await cache.GetAsync(new(AppScreen.Login));
-                if (cache != surfaces || IsDisposed || Disposing || screen != AppScreen.Login) return;
+                Bitmap? image = await cache.GetAsync(new(AppScreen.Login));
+                if (image == null || cache != surfaces || IsDisposed || Disposing || screen != AppScreen.Login) return;
                 sceneCache = image;
                 LayoutSceneControls();
                 RefreshInputFabric();
@@ -524,8 +530,8 @@ namespace LP_PopovD_App
             {
                 if (!loginFlow.CodeRequested)
                 {
-                    Bitmap next = await cache.GetAsync(new(AppScreen.Login, true));
-                    if (cache != surfaces || IsDisposed || Disposing) return;
+                    Bitmap? next = await cache.GetAsync(new(AppScreen.Login, true));
+                    if (next == null || cache != surfaces || IsDisposed || Disposing) return;
                     Bitmap before = CaptureScreen();
                     loginFlow.RequestCode();
                     authStatus = "Тестовый режим: введите любой непустой код.";
@@ -545,9 +551,9 @@ namespace LP_PopovD_App
                 }
                 else
                 {
-                    Bitmap cleanSurface = await cache.GetAsync(new(AppScreen.Login, true, true));
+                    Bitmap? cleanSurface = await cache.GetAsync(new(AppScreen.Login, true, true));
                     await cache.GetAsync(new(AppScreen.Menu));
-                    if (cache != surfaces || IsDisposed || Disposing || !loginFlow.TryConfirm(codeInput.Value)) return;
+                    if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing || !loginFlow.TryConfirm(codeInput.Value)) return;
                     successLogin = loginInput.Value.Trim();
                     successRemember = rememberCheck.Checked;
                     Bitmap before = CaptureScreen();
