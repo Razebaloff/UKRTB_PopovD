@@ -266,6 +266,16 @@ dotnet run --project Tests/StateChecks.csproj -c Release
 dotnet run --project Tests/SceneCacheChecks.csproj -c Release
 ```
 
+Проверка самих WinForms-контролов в Windows:
+
+```powershell
+dotnet run --project Tests/WinFormsChecks.csproj -c Release
+```
+
+Этот тест проверяет повторное назначение масштаба, живые шрифты, снимки и отрисовку
+чекбокса, кнопки и полей ввода. Он добавлен после ошибки отрисовки «Запомнить меня».
+Проект теста собран без предупреждений; его выполнение требует Windows и в этой Linux-среде не проверено.
+
 Замеры отрисовки и границы проверки указаны в [PERFORMANCE.md](PERFORMANCE.md).
 Само окно WinForms в Windows в этой среде не запускалось. Замеры Linux/libgdiplus
 не являются измерением FPS на пользовательском ПК.
