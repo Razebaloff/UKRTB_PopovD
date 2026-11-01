@@ -30,7 +30,8 @@ namespace LP_PopovD_App
             catch { result.Dispose(); throw; }
         }
 
-        internal static void Draw(Graphics g, Size size, AppScreen screen, bool includeControls = false, string status = "", bool includeSticks = true)
+        internal static void Draw(Graphics g, Size size, AppScreen screen, bool includeControls = false, string status = "", bool includeSticks = true,
+            bool codeRequested = false, bool authPanels = true)
         {
             GraphicsState saved = g.Save();
             g.Clear(Color.FromArgb(137, 177, 202));
@@ -39,7 +40,7 @@ namespace LP_PopovD_App
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             NativeIceDrawing.Draw(g, size);
-            DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks);
+            DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks, codeRequested: codeRequested, authPanels: authPanels);
             g.Restore(saved);
         }
 
@@ -66,7 +67,7 @@ namespace LP_PopovD_App
         }
 
         private static void DrawContents(Graphics g, Size size, AppScreen screen, bool includeControls,
-            string status, Rectangle? pixelViewport = null, bool includeSticks = true)
+            string status, Rectangle? pixelViewport = null, bool includeSticks = true, bool codeRequested = false, bool authPanels = true)
         {
             GraphicsState saved = g.Save();
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
@@ -91,7 +92,7 @@ namespace LP_PopovD_App
                     break;
                 case AppScreen.Login:
                 case AppScreen.Registration:
-                    JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks);
+                    JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks, codeRequested, authPanels);
                     break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);

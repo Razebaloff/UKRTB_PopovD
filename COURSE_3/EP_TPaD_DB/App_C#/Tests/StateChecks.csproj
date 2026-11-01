@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../App/AuthInputRules.cs" Link="AuthInputRules.cs" />
+    <Compile Include="../App/LoginFlowState.cs" Link="LoginFlowState.cs" />
+    <Compile Include="../App/RememberedLoginStore.cs" Link="RememberedLoginStore.cs" />
+    <Compile Include="../App/StickAnimationState.cs" Link="StickAnimationState.cs" />
+  </ItemGroup>
+</Project>

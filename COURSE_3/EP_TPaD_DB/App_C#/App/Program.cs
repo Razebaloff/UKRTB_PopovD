@@ -31,8 +31,7 @@ namespace LP_PopovD_App
             }
             finally
             {
-                ArtworkResources.Dispose();
-                NativeIceDrawing.Dispose();
+                SceneSurfaceCache.DisposeRendererResources();
             }
         }
     }

@@ -1,99 +1,121 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
     internal static class StickFeedbackDrawing
     {
         private static readonly PointF Center = new(800, 58);
-        internal static readonly RectangleF AnimationBounds = new(742, -16, 116, 148);
+        internal static readonly RectangleF AnimationBounds = new(741, -16, 118, 148);
+        private static readonly SnowSeed[] snow = SnowDrawing.Seeds(148, 72419);
+        private static Bitmap? left, right;
+        private static int spriteSide;
 
-        private static float Smooth(float value)
+        internal static void Prepare(Size size)
         {
-            value = Math.Clamp(value, 0, 1);
-            return value * value * (3 - 2 * value);
+            int side = Math.Max(64, (int)Math.Ceiling(RinkDrawing.GetCanvasBounds(size).Width / 1600 * 110));
+            if (spriteSide == side && left != null) return;
+            Dispose();
+            left = Sprite(side, false);
+            right = Sprite(side, true);
+            spriteSide = side;
+        }
+
+        private static Bitmap Sprite(int side, bool mirrored)
+        {
+            Bitmap image = new(side, side, PixelFormat.Format32bppPArgb);
+            image.SetResolution(96, 96);
+            using Graphics g = Graphics.FromImage(image);
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.ScaleTransform(side / 100f, side / 100f);
+            g.TranslateTransform(-750, -8);
+            HeaderDrawing.DrawStick(g, mirrored);
+            return image;
         }
 
         internal static Rectangle PixelBounds(Size size)
         {
             RectangleF c = RinkDrawing.GetCanvasBounds(size);
             float s = c.Width / RinkDrawing.Width;
-            return Rectangle.Ceiling(new RectangleF(c.X + AnimationBounds.X * s, c.Y + AnimationBounds.Y * s,
-                AnimationBounds.Width * s, AnimationBounds.Height * s));
+            return Rectangle.Intersect(new Rectangle(Point.Empty, size), Rectangle.Ceiling(new RectangleF(
+                c.X + AnimationBounds.X * s - 2, c.Y + AnimationBounds.Y * s - 2,
+                AnimationBounds.Width * s + 4, AnimationBounds.Height * s + 4)));
         }
 
         internal static void Draw(Graphics g, Size size, float? progress = null, bool fadeAtEnd = false)
         {
             if (size.Width < 1 || size.Height < 1) return;
+            Prepare(size);
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             GraphicsState saved = g.Save();
+            CompositingMode mode = g.CompositingMode;
+            g.CompositingMode = CompositingMode.SourceOver;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.CompositingQuality = CompositingQuality.HighQuality;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            g.InterpolationMode = InterpolationMode.HighQualityBilinear;
             g.TranslateTransform(canvas.X, canvas.Y);
             g.ScaleTransform(canvas.Width / RinkDrawing.Width, canvas.Height / RinkDrawing.Height);
-            // Ограничивается только прозрачный эффект; фрагмент фона сюда не копируется.
             g.SetClip(AnimationBounds, CombineMode.Intersect);
-            if (!progress.HasValue)
-                HeaderDrawing.DrawSticks(g);
-            else
+            float p = Math.Clamp(progress ?? 0, 0, 1);
+            float turn = p >= 1 ? 0 : 360 * SnowDrawing.Smooth(p);
+            float envelope = MathF.Sin(MathF.PI * p);
+            float opacity = fadeAtEnd && progress.HasValue
+                ? SnowDrawing.Smooth(p / .10f) * (1 - SnowDrawing.Smooth((p - .84f) / .16f)) : 1;
+            float scale = 1 - .23f * SnowDrawing.Smooth(p / .18f) * SnowDrawing.Smooth((1 - p) / .18f);
+            using ImageAttributes alpha = new();
+            if (p > 0 && p < 1) DrawSnow(g, p, envelope * opacity);
+            if (envelope > .01f)
             {
-                float p = Math.Clamp(progress.Value, 0, 1);
-                if (p <= 0 || p >= 1)
-                {
-                    if (!fadeAtEnd) HeaderDrawing.DrawSticks(g);
-                    g.Restore(saved);
-                    return;
-                }
-                float angle = 360 * Smooth(p);
-                float opacity = fadeAtEnd ? Smooth(p / .08f) * (1 - Smooth((p - .88f) / .12f)) : 1;
-                float shrink = 1 - .24f * Smooth(p / .14f) * Smooth((1 - p) / .14f);
-                DrawWave(g, p, angle, opacity);
-                float trail = MathF.Sin(MathF.PI * p) * opacity;
-                for (int i = 2; i >= 1; i--)
-                {
-                    float behind = angle - i * 13 * MathF.Sin(MathF.PI * p);
-                    DrawTurned(g, false, behind, shrink, trail * .09f / i);
-                    DrawTurned(g, true, -behind, shrink, trail * .09f / i);
-                }
-                DrawTurned(g, false, angle, shrink, opacity);
-                DrawTurned(g, true, -angle, shrink, opacity);
+                DrawTurned(g, left!, turn - 10 * envelope, scale, envelope * .10f * opacity, alpha);
+                DrawTurned(g, right!, -turn + 10 * envelope, scale, envelope * .10f * opacity, alpha);
             }
+            DrawTurned(g, left!, turn, scale, opacity, alpha);
+            DrawTurned(g, right!, -turn, scale, opacity, alpha);
             g.Restore(saved);
+            g.CompositingMode = mode;
         }
 
-        private static void DrawTurned(Graphics g, bool mirrored, float angle, float scale, float opacity)
+        private static void DrawTurned(Graphics g, Image image, float angle, float scale, float opacity, ImageAttributes alpha)
         {
-            if (opacity <= 0) return;
+            if (opacity <= .001f) return;
             GraphicsState saved = g.Save();
             g.TranslateTransform(Center.X, Center.Y);
             g.RotateTransform(angle);
             g.ScaleTransform(scale, scale);
             g.TranslateTransform(-Center.X, -Center.Y);
-            HeaderDrawing.DrawStick(g, mirrored, opacity);
+            alpha.SetColorMatrix(new ColorMatrix { Matrix33 = opacity });
+            g.DrawImage(image, new Rectangle(750, 8, 100, 100), 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, alpha);
             g.Restore(saved);
         }
 
-        private static void DrawWave(Graphics g, float progress, float angle, float opacity)
+        private static void DrawSnow(Graphics g, float p, float strength)
         {
-            float q = Math.Clamp((progress - .08f) / .92f, 0, 1);
-            float strength = MathF.Sin(MathF.PI * q) * (1 - q) * opacity;
-            if (strength <= .001f) return;
-            float radius = 18 + 35 * (1 - (1 - q) * (1 - q));
-            RectangleF oval = new(Center.X - radius, Center.Y - radius * .54f, radius * 2, radius * 1.08f);
-            using Pen haze = new(Color.FromArgb((int)(31 * strength), 163, 222, 250), 8 * (1 - q) + 1.5f)
-                { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen front = new(Color.FromArgb((int)(143 * strength), 230, 249, 255), 1.8f * (1 - q) + .55f)
-                { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            for (int i = 0; i < 2; i++)
+            using SolidBrush brush = new(Color.White);
+            using Pen streak = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            for (int i = 0; i < 7; i++)
             {
-                float start = angle * .3f + i * 180 - 35;
-                g.DrawArc(haze, oval, start, 125);
-                g.DrawArc(front, oval, start, 125);
+                float angle = i * 2.39996f + p * 8;
+                float radius = 14 + i * 4 + p * 13;
+                brush.Color = Color.FromArgb((int)(12 * strength), 237, 249, 255);
+                g.FillEllipse(brush, Center.X + MathF.Cos(angle) * radius - 13,
+                    Center.Y + MathF.Sin(angle) * radius * .75f - 7, 26, 14);
             }
-            oval.Inflate(-6, -3);
-            using Pen wake = new(Color.FromArgb((int)(43 * strength), 185, 231, 252), .8f);
-            g.DrawArc(wake, oval, 150 - angle * .2f, 128);
+            for (int i = 0; i < snow.Length; i++)
+            {
+                SnowSeed seed = snow[i];
+                float age = (seed.Phase + p * (1 + seed.Speed * .45f)) % 1;
+                float angle = seed.Angle + p * (8 + seed.Speed * 5) + age * 2;
+                float radius = 7 + age * (34 + seed.X * 14);
+                float x = Center.X + MathF.Cos(angle) * radius;
+                float y = Center.Y + MathF.Sin(angle) * radius * .83f + MathF.Sin(p * 12 + seed.Angle) * 2;
+                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius * .72f,
+                    -MathF.Sin(angle) * (1 + seed.Speed * 2), MathF.Cos(angle) * (1 + seed.Speed),
+                    strength * MathF.Sin(age * MathF.PI) * (.38f + seed.Y * .6f), i % 13 == 0);
+            }
+        }
+
+        internal static void Dispose()
+        {
+            left?.Dispose(); right?.Dispose(); left = right = null; spriteSide = 0;
         }
     }
 }

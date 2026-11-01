@@ -10,6 +10,11 @@ namespace LP_PopovD_App
 
         internal static Bitmap Get(string name)
         {
+            lock (images) return GetCore(name);
+        }
+
+        private static Bitmap GetCore(string name)
+        {
             if (images.TryGetValue(name, out Bitmap? image))
                 return image;
             using Stream stream = typeof(ArtworkResources).Assembly
@@ -29,12 +34,18 @@ namespace LP_PopovD_App
             g.PageUnit = GraphicsUnit.Pixel;
             g.CompositingMode = CompositingMode.SourceCopy;
             // У исходников DPI от 25 до 600. Копируем именно пиксели, без физического масштаба.
-            g.DrawImage(original, new Rectangle(0, 0, copy.Width, copy.Height),
-                0, 0, original.Width, original.Height, GraphicsUnit.Pixel);
+            lock (original)
+                g.DrawImage(original, new Rectangle(0, 0, copy.Width, copy.Height),
+                    0, 0, original.Width, original.Height, GraphicsUnit.Pixel);
             return copy;
         }
 
         internal static Bitmap GetEmblem(string name)
+        {
+            lock (images) return GetEmblemCore(name);
+        }
+
+        private static Bitmap GetEmblemCore(string name)
         {
             string key = name + ":emblem";
             if (images.TryGetValue(key, out Bitmap? emblem))

@@ -67,8 +67,18 @@ namespace LP_PopovD_App
 
         private static void DrawClub(Graphics g, string name, float centerX)
         {
-            // Только сама эмблема: без подложки, круглой маски и пустых полей источника.
-            DrawImageFit(g, ArtworkResources.GetEmblem(name), new RectangleF(centerX - 44, 20, 88, 80));
+            // Исходные эмблемы с лёгкой контактной тенью: без масок, подложек и изменения символики.
+            Image emblem = ArtworkResources.GetEmblem(name);
+            RectangleF bounds = new(centerX - 44, 20, 88, 80);
+            float scale = Math.Min(bounds.Width / emblem.Width, bounds.Height / emblem.Height);
+            Rectangle destination = Rectangle.Round(new RectangleF(centerX - emblem.Width * scale / 2,
+                bounds.Y + (bounds.Height - emblem.Height * scale) / 2 + 1.4f,
+                emblem.Width * scale, emblem.Height * scale));
+            using ImageAttributes contact = new();
+            contact.SetColorMatrix(new ColorMatrix(new[] { new float[] { 0, 0, 0, 0, 0 }, new float[] { 0, 0, 0, 0, 0 },
+                new float[] { 0, 0, 0, 0, 0 }, new float[] { 0, 0, 0, .28f, 0 }, new float[] { .025f, .08f, .12f, 0, 1 } }));
+            lock (emblem) g.DrawImage(emblem, destination, 0, 0, emblem.Width, emblem.Height, GraphicsUnit.Pixel, contact);
+            DrawImageFit(g, emblem, bounds);
         }
 
         internal static void DrawSticks(Graphics g)
@@ -99,12 +109,12 @@ namespace LP_PopovD_App
             RectangleF destination = new(bounds.X + (bounds.Width - width) / 2,
                 bounds.Y + (bounds.Height - height) / 2, width, height);
             RectangleF source = new(0, 0, image.Width, image.Height);
-            if (opacity >= 1) g.DrawImage(image, destination, source, GraphicsUnit.Pixel);
+            if (opacity >= 1) { lock (image) g.DrawImage(image, destination, source, GraphicsUnit.Pixel); }
             else if (opacity > 0)
             {
                 using ImageAttributes attributes = new();
                 attributes.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(opacity, 0, 1) });
-                g.DrawImage(image, Rectangle.Round(destination), 0, 0, image.Width, image.Height,
+                lock (image) g.DrawImage(image, Rectangle.Round(destination), 0, 0, image.Width, image.Height,
                     GraphicsUnit.Pixel, attributes);
             }
         }

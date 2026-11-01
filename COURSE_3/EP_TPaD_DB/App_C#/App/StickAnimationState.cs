@@ -2,7 +2,7 @@ namespace LP_PopovD_App
 {
     internal sealed class StickAnimationState
     {
-        internal const int DurationMilliseconds = 760;
+        internal const int DurationMilliseconds = 540;
         private Action? pendingAction;
         private long startedAt = -1;
         internal bool Active => pendingAction != null;
