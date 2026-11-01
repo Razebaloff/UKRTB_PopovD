@@ -7,6 +7,7 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
+        protected override bool ShowFocusCues => false;
 
         public RinkMenuButton()
         {
@@ -58,7 +59,7 @@ namespace LP_PopovD_App
             {
                 detail.SmoothingMode = SmoothingMode.AntiAlias;
                 detail.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                DrawButton(detail, hovered, pressed, Focused && ShowFocusCues);
+                DrawButton(detail, hovered, pressed, Focused);
             }
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;

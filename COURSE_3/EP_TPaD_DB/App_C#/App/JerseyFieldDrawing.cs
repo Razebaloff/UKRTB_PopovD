@@ -1,97 +1,91 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace LP_PopovD_App
 {
+    // Только надпись на ткани. У области ввода нет отдельной поверхности или контура.
     internal static class JerseyFieldDrawing
     {
         internal static readonly Color Ink = Color.FromArgb(235, 241, 245);
-        internal static readonly Color CueInk = Color.FromArgb(204, 220, 231);
-        internal static readonly Color FallbackFill = Color.FromArgb(24, 46, 70);
+        internal static readonly Color FallbackFill = Color.FromArgb(9, 26, 51);
 
-        private static float Ripple(float x, RectangleF bounds)
-            => .55f * MathF.Sin((x - bounds.X) * .047f + bounds.Y * .031f)
-                + .25f * MathF.Sin((x - bounds.X) * .113f + bounds.Y * .019f);
-
-        // Плоскость вставки использует свет и складки той же ткани, что и спинка.
-        internal static void Shade(float x, float y, float scale, RectangleF bounds, float alpha,
-            ref float red, ref float green, ref float blue)
+        internal static void DrawCue(Graphics g, RectangleF bounds, string text, RectangleF? viewport = null)
         {
-            if (x < bounds.Left - 4 || x > bounds.Right + 4 || y < bounds.Top - 5 || y > bounds.Bottom + 5) return;
-            float radius = bounds.Height / 2;
-            float py = y - (bounds.Top + radius) + Ripple(x, bounds);
-            float px = Math.Max(0, Math.Abs(x - (bounds.Left + bounds.Width / 2)) - (bounds.Width / 2 - radius));
-            float distance = MathF.Sqrt(px * px + py * py) - radius;
-            if (distance > 3) return;
-            float normalY = Math.Clamp(py / radius, -1, 1);
-            float coverage = Math.Clamp(.5f - distance * scale, 0, 1);
-            float clothAlpha = alpha / 255;
-            float light = Math.Clamp(.52f + (red * .2126f + green * .7152f + blue * .0722f) / Math.Max(1, clothAlpha) / 34,
-                .58f, 1.65f);
-            float upper = (1 - normalY) / 2;
-            float insetShadow = Math.Max(0, 1 + distance / 5) * (.11f + .28f * upper);
-            float lowerLip = Math.Max(0, 1 - Math.Abs(distance + 1.4f) / 1.1f) * Math.Max(0, normalY) * .12f;
-            float lighting = light * (1 - insetShadow) + lowerLip;
-            red += (26 * lighting * clothAlpha - red) * coverage;
-            green += (48 * lighting * clothAlpha - green) * coverage;
-            blue += (73 * lighting * clothAlpha - blue) * coverage;
-            if (distance > 0)
-            {
-                float contact = 1 - (1 - distance / 3) * .18f * (1 - coverage);
-                red *= contact; green *= contact; blue *= contact;
-            }
-        }
+            if (string.IsNullOrEmpty(text)) return;
+            RectangleF visible = viewport.HasValue ? RectangleF.Intersect(bounds, viewport.Value) : bounds;
+            if (visible.IsEmpty) return;
+            using Matrix transform = g.Transform;
+            float[] m = transform.Elements;
+            float sx = m[0], sy = m[3], dx = m[4], dy = m[5];
+            if (sx <= 0 || sy <= 0 || Math.Abs(m[1]) > .001f || Math.Abs(m[2]) > .001f)
+                throw new NotSupportedException("Для надписи нужен прямой масштаб без поворота.");
+            int left = (int)MathF.Floor(visible.Left * sx + dx), top = (int)MathF.Floor(visible.Top * sy + dy);
+            int width = (int)MathF.Ceiling(visible.Right * sx + dx) - left;
+            int height = (int)MathF.Ceiling(visible.Bottom * sy + dy) - top;
+            if (width < 1 || height < 1) return;
 
-        private static GraphicsPath Seam(RectangleF bounds, float inset)
-        {
-            bounds.Inflate(-inset, -inset);
-            float radius = bounds.Height / 2, left = bounds.Left + radius, right = bounds.Right - radius;
-            float centerY = bounds.Top + radius;
-            List<PointF> points = new();
-            void Add(float x, float y) => points.Add(new PointF(x, y - Ripple(x, bounds)));
-            for (int i = 0; i <= 24; i++)
+            using FontFamily family = new(RinkTypography.FamilyName);
+            using StringFormat centered = new()
             {
-                float angle = MathF.PI / 2 + MathF.PI * i / 24;
-                Add(left + radius * MathF.Cos(angle), centerY + radius * MathF.Sin(angle));
-            }
-            for (float x = left + 8; x < right; x += 8) Add(x, bounds.Top);
-            for (int i = 0; i <= 24; i++)
-            {
-                float angle = -MathF.PI / 2 + MathF.PI * i / 24;
-                Add(right + radius * MathF.Cos(angle), centerY + radius * MathF.Sin(angle));
-            }
-            for (float x = right - 8; x > left; x -= 8) Add(x, bounds.Bottom);
-            GraphicsPath path = new();
-            path.AddLines(points.ToArray()); path.CloseFigure();
-            return path;
-        }
-
-        internal static void DrawStitches(Graphics g, RectangleF bounds, bool focused = false)
-        {
-            using GraphicsPath outer = Seam(bounds, 3.8f);
-            using Pen channel = new(Color.FromArgb(110, 3, 12, 24), 1.7f);
-            g.DrawPath(channel, outer);
-            using Pen thread = new(focused ? Color.FromArgb(204, 143, 199, 225) : Color.FromArgb(150, 91, 121, 149), .85f)
-            {
-                DashPattern = new[] { 2.3f, 2.4f }, DashOffset = bounds.Y % 5, StartCap = LineCap.Round, EndCap = LineCap.Round
+                Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center,
+                FormatFlags = StringFormatFlags.NoWrap
             };
-            g.DrawPath(thread, outer);
-            using GraphicsPath inner = Seam(bounds, 7.2f);
-            using Pen second = new(Color.FromArgb(focused ? 136 : 86, 125, 155, 180), .65f)
+            using GraphicsPath letters = new();
+            letters.AddString(text, family, (int)FontStyle.Bold, 22, bounds, centered);
+            if (letters.PointCount == 0) return;
+            PointF[] points = letters.PathPoints;
+            float centerY = bounds.Top + bounds.Height / 2;
+            float centerLight = JerseyFabricDrawing.InkLight(bounds.Left + bounds.Width / 2, centerY);
+            for (int i = 0; i < points.Length; i++)
             {
-                DashPattern = new[] { 2f, 3f }, DashOffset = 1.6f
-            };
-            g.DrawPath(second, inner);
-        }
+                points[i].Y += Math.Clamp((JerseyFabricDrawing.InkLight(points[i].X, centerY) - centerLight) * 2, -.5f, .5f);
+                // Масштабируем координаты один раз: смена полосы не меняет сглаживание контура.
+                points[i].X = (float)((double)points[i].X * sx + dx - left);
+                points[i].Y = (float)((double)points[i].Y * sy + dy - top);
+            }
+            using GraphicsPath conformed = new(points, letters.PathTypes, letters.FillMode);
 
-        internal static void DrawCue(Graphics g, RectangleF bounds, string text)
-        {
-            using Font font = new(RinkTypography.FamilyName, 21, FontStyle.Bold, GraphicsUnit.Pixel);
-            using StringFormat centered = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using SolidBrush shadow = new(Color.FromArgb(115, 3, 10, 22));
-            using SolidBrush ink = new(CueInk);
-            RectangleF offset = bounds; offset.Offset(0, .7f);
-            g.DrawString(text, font, shadow, offset, centered);
-            g.DrawString(text, font, ink, bounds, centered);
+            // Маска ограничена видимой полосой, в том числе при экспорте 32K.
+            using Bitmap print = new(width, height, PixelFormat.Format32bppPArgb);
+            print.SetResolution(96, 96);
+            using (Graphics mask = Graphics.FromImage(print))
+            {
+                mask.SmoothingMode = SmoothingMode.AntiAlias;
+                mask.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                mask.FillPath(Brushes.White, conformed);
+            }
+            BitmapData data = print.LockBits(new Rectangle(Point.Empty, print.Size),
+                ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
+            try
+            {
+                int[] row = new int[width];
+                for (int y = 0; y < height; y++)
+                {
+                    IntPtr address = IntPtr.Add(data.Scan0, y * data.Stride);
+                    Marshal.Copy(address, row, 0, width);
+                    float wy = (top + y + .5f - dy) / sy;
+                    for (int x = 0; x < width; x++)
+                    {
+                        int alpha = (int)((uint)row[x] >> 24);
+                        if (alpha == 0) continue;
+                        float wx = (left + x + .5f - dx) / sx;
+                        float light = JerseyFabricDrawing.InkLight(wx, wy);
+                        int r = (int)Math.Clamp(Ink.R * light, 0, 255) * alpha / 255;
+                        int green = (int)Math.Clamp(Ink.G * light, 0, 255) * alpha / 255;
+                        int b = (int)Math.Clamp(Ink.B * light, 0, 255) * alpha / 255;
+                        row[x] = alpha << 24 | r << 16 | green << 8 | b;
+                    }
+                    Marshal.Copy(row, 0, address, width);
+                }
+            }
+            finally { print.UnlockBits(data); }
+            GraphicsState state = g.Save();
+            g.ResetTransform();
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            g.DrawImageUnscaled(print, left, top);
+            g.Restore(state);
         }
     }
 }

@@ -8,11 +8,22 @@ namespace LP_PopovD_App
     internal sealed class CapsuleInput : UserControl
     {
         private readonly TextBox input = new();
-        private readonly Label cue = new();
+        private readonly ClothCue cue = new();
         private Font? inputFont;
         private Font? cueFont;
         private float textPixels;
         private IntPtr fabricBrush;
+        protected override bool ShowFocusCues => false;
+
+        private sealed class ClothCue : Label
+        {
+            protected override void OnPaintBackground(PaintEventArgs e) { }
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                if (Parent is CapsuleInput field) field.PaintCue(e.Graphics, Bounds);
+                else base.OnPaint(e);
+            }
+        }
 
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         internal RectangleF SceneBounds { get; set; } = new(560, 330, 480, 64);
@@ -41,7 +52,7 @@ namespace LP_PopovD_App
             cue.Text = placeholder;
             cue.TextAlign = ContentAlignment.MiddleCenter;
             cue.BackColor = Color.Transparent;
-            cue.ForeColor = JerseyFieldDrawing.CueInk;
+            cue.ForeColor = JerseyFieldDrawing.Ink;
             cue.TabStop = false;
             cue.Cursor = Cursors.IBeam;
             cue.AccessibleName = placeholder;
@@ -61,8 +72,8 @@ namespace LP_PopovD_App
             if (Math.Abs(textPixels - pixels) < 0.05f) return;
             textPixels = pixels;
             Font? oldInput = inputFont, oldCue = cueFont;
-            inputFont = new Font(RinkTypography.FamilyName, pixels, FontStyle.Regular, GraphicsUnit.Pixel);
-            cueFont = new Font(RinkTypography.FamilyName, Math.Max(12, 21 * scale), FontStyle.Bold, GraphicsUnit.Pixel);
+            inputFont = new Font(RinkTypography.FamilyName, pixels, FontStyle.Bold, GraphicsUnit.Pixel);
+            cueFont = new Font(RinkTypography.FamilyName, pixels, FontStyle.Bold, GraphicsUnit.Pixel);
             input.Font = inputFont;
             cue.Font = cueFont;
             oldInput?.Dispose();
@@ -100,13 +111,22 @@ namespace LP_PopovD_App
         {
             OnPaintBackground(e);
             base.OnPaint(e);
-            if (Width < 3 || Height < 3 || !ContainsFocus) return;
-            GraphicsState state = e.Graphics.Save();
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.ScaleTransform(Width / SceneBounds.Width, Height / SceneBounds.Height);
-            e.Graphics.TranslateTransform(-SceneBounds.X, -SceneBounds.Y);
-            JerseyFieldDrawing.DrawStitches(e.Graphics, SceneBounds, focused: true);
-            e.Graphics.Restore(state);
+        }
+
+        private void PaintCue(Graphics g, Rectangle localBounds)
+        {
+            if (Parent is not Form1 form) return;
+            Rectangle pixels = new(Left + localBounds.Left, Top + localBounds.Top, localBounds.Width, localBounds.Height);
+            form.PaintScene(g, pixels);
+            RectangleF canvas = RinkDrawing.GetCanvasBounds(form.ClientSize);
+            float scale = canvas.Width / RinkDrawing.Width;
+            GraphicsState state = g.Save();
+            g.TranslateTransform(canvas.X - pixels.X, canvas.Y - pixels.Y);
+            g.ScaleTransform(scale, scale);
+            RectangleF viewport = new((pixels.X - canvas.X) / scale, (pixels.Y - canvas.Y) / scale,
+                pixels.Width / scale, pixels.Height / scale);
+            JerseyFieldDrawing.DrawCue(g, SceneBounds, cue.Text, viewport);
+            g.Restore(state);
         }
 
         // Стандартный EDIT сохраняет каретку, выделение, Tab, IME и маскировку пароля.
