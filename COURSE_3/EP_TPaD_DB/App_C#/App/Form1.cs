@@ -111,7 +111,12 @@ namespace LP_PopovD_App
             graphics.Restore(state);
         }
 
-        private void ClearSceneCache() { sceneCache?.Dispose(); sceneCache = null; }
+        private void ClearSceneCache()
+        {
+            sceneCache?.Dispose(); sceneCache = null;
+            foreach (Control control in Controls)
+                if (control is CapsuleInput field) field.RefreshFabric();
+        }
 
         private void DisposeArtwork()
         {
@@ -151,7 +156,11 @@ namespace LP_PopovD_App
             for (int i = 0; i < inputs.Length; i++)
             {
                 inputs[i].SetScale(scale);
-                if (i < fields.Length) inputs[i].Bounds = ToPixels(fields[i]);
+                if (i < fields.Length)
+                {
+                    inputs[i].SceneBounds = fields[i];
+                    inputs[i].Bounds = ToPixels(fields[i]);
+                }
             }
             submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : "ВОЙТИ";
             submitButton.AccessibleName = registration ? "Зарегистрироваться" : "Войти";

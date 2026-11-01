@@ -1,5 +1,7 @@
 using System.Drawing.Drawing2D;
 using System.ComponentModel;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace LP_PopovD_App
 {
@@ -10,6 +12,10 @@ namespace LP_PopovD_App
         private Font? inputFont;
         private Font? cueFont;
         private float textPixels;
+        private IntPtr fabricBrush;
+
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        internal RectangleF SceneBounds { get; set; } = new(560, 330, 480, 64);
 
         internal event EventHandler? ValueChanged;
         [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -25,8 +31,8 @@ namespace LP_PopovD_App
             AccessibleName = name;
             input.BorderStyle = BorderStyle.None;
             input.TextAlign = HorizontalAlignment.Center;
-            input.BackColor = JerseyDrawing.InputFill;
-            input.ForeColor = JerseyDrawing.InputInk;
+            input.BackColor = JerseyFieldDrawing.FallbackFill;
+            input.ForeColor = JerseyFieldDrawing.Ink;
             input.UseSystemPasswordChar = password;
             input.MaxLength = maxLength;
             input.AccessibleName = name;
@@ -34,15 +40,15 @@ namespace LP_PopovD_App
             if (password) input.ImeMode = ImeMode.Disable;
             cue.Text = placeholder;
             cue.TextAlign = ContentAlignment.MiddleCenter;
-            cue.BackColor = JerseyDrawing.InputFill;
-            cue.ForeColor = Color.FromArgb(73, 100, 120);
+            cue.BackColor = Color.Transparent;
+            cue.ForeColor = JerseyFieldDrawing.CueInk;
             cue.TabStop = false;
             cue.Cursor = Cursors.IBeam;
             cue.AccessibleName = placeholder;
             cue.Click += (_, _) => input.Focus();
             input.Enter += (_, _) => { cue.Visible = false; Invalidate(); };
             input.Leave += (_, _) => { UpdateCue(); Invalidate(); };
-            input.TextChanged += (_, _) => { UpdateCue(); ValueChanged?.Invoke(this, EventArgs.Empty); };
+            input.TextChanged += (_, _) => { UpdateCue(); input.Invalidate(); ValueChanged?.Invoke(this, EventArgs.Empty); };
             Controls.Add(input);
             Controls.Add(cue);
             cue.BringToFront();
@@ -56,7 +62,7 @@ namespace LP_PopovD_App
             textPixels = pixels;
             Font? oldInput = inputFont, oldCue = cueFont;
             inputFont = new Font(RinkTypography.FamilyName, pixels, FontStyle.Regular, GraphicsUnit.Pixel);
-            cueFont = new Font(RinkTypography.FamilyName, pixels * 0.92f, FontStyle.Bold, GraphicsUnit.Pixel);
+            cueFont = new Font(RinkTypography.FamilyName, Math.Max(12, 21 * scale), FontStyle.Bold, GraphicsUnit.Pixel);
             input.Font = inputFont;
             cue.Font = cueFont;
             oldInput?.Dispose();
@@ -73,6 +79,7 @@ namespace LP_PopovD_App
         private void LayoutInput()
         {
             if (Width < 3 || Height < 3) return;
+            ClearFabricBrush();
             int inset = Math.Max(12, Height / 3);
             int textHeight = Math.Min(Height - 8, input.PreferredHeight);
             input.Bounds = new Rectangle(inset, (Height - textHeight) / 2,
@@ -81,28 +88,80 @@ namespace LP_PopovD_App
         }
 
         protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutInput(); }
+        protected override void OnLocationChanged(EventArgs e) { ClearFabricBrush(); base.OnLocationChanged(e); }
+        protected override void OnParentChanged(EventArgs e) { ClearFabricBrush(); base.OnParentChanged(e); }
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); input.Focus(); }
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             if (Parent is Form1 form) form.PaintScene(e.Graphics, Bounds);
-            else e.Graphics.Clear(Color.FromArgb(22, 53, 78));
+            else e.Graphics.Clear(JerseyFieldDrawing.FallbackFill);
         }
         protected override void OnPaint(PaintEventArgs e)
         {
             OnPaintBackground(e);
             base.OnPaint(e);
-            if (Width < 3 || Height < 3) return;
+            if (Width < 3 || Height < 3 || !ContainsFocus) return;
+            GraphicsState state = e.Graphics.Save();
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using GraphicsPath shape = JerseyDrawing.Capsule(new RectangleF(1.5f, 1.5f, Width - 3, Height - 3));
-            using SolidBrush fill = new(JerseyDrawing.InputFill);
-            using Pen edge = new(ContainsFocus ? Color.FromArgb(49, 155, 213) : Color.FromArgb(147, 181, 203),
-                ContainsFocus ? 2.5f : 1.5f);
-            e.Graphics.FillPath(fill, shape);
-            e.Graphics.DrawPath(edge, shape);
+            e.Graphics.ScaleTransform(Width / SceneBounds.Width, Height / SceneBounds.Height);
+            e.Graphics.TranslateTransform(-SceneBounds.X, -SceneBounds.Y);
+            JerseyFieldDrawing.DrawStitches(e.Graphics, SceneBounds, focused: true);
+            e.Graphics.Restore(state);
         }
+
+        // Стандартный EDIT сохраняет каретку, выделение, Tab, IME и маскировку пароля.
+        // Его фон — точный фрагмент сцены, а обычные символы рисуются поверх ткани.
+        protected override void WndProc(ref Message m)
+        {
+            const int WmCtlColorEdit = 0x0133, WmCtlColorStatic = 0x0138;
+            if ((m.Msg == WmCtlColorEdit || m.Msg == WmCtlColorStatic) &&
+                input.IsHandleCreated && m.LParam == input.Handle)
+            {
+                EnsureFabricBrush();
+                if (fabricBrush != IntPtr.Zero)
+                {
+                    SetTextColor(m.WParam, ColorTranslator.ToWin32(input.ForeColor));
+                    SetBkMode(m.WParam, 1); // TRANSPARENT: без одноцветных прямоугольников под буквами.
+                    SetBrushOrgEx(m.WParam, 0, 0, IntPtr.Zero);
+                    m.Result = fabricBrush;
+                    return;
+                }
+            }
+            base.WndProc(ref m);
+        }
+
+        private void EnsureFabricBrush()
+        {
+            if (fabricBrush != IntPtr.Zero || Parent is not Form1 form || input.Width < 1 || input.Height < 1) return;
+            using Bitmap background = new(input.Width, input.Height, PixelFormat.Format32bppPArgb);
+            background.SetResolution(96, 96);
+            using (Graphics g = Graphics.FromImage(background))
+                form.PaintScene(g, new Rectangle(Left + input.Left, Top + input.Top, input.Width, input.Height));
+            IntPtr bitmap = background.GetHbitmap();
+            try { fabricBrush = CreatePatternBrush(bitmap); }
+            finally { DeleteObject(bitmap); }
+        }
+
+        private void ClearFabricBrush()
+        {
+            if (fabricBrush == IntPtr.Zero) return;
+            DeleteObject(fabricBrush); fabricBrush = IntPtr.Zero;
+            input.Invalidate();
+        }
+
+        internal void RefreshFabric() { ClearFabricBrush(); Invalidate(true); }
+
+        protected override void OnHandleDestroyed(EventArgs e) { ClearFabricBrush(); base.OnHandleDestroyed(e); }
+
+        [DllImport("gdi32.dll")] private static extern IntPtr CreatePatternBrush(IntPtr bitmap);
+        [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
+        [DllImport("gdi32.dll")] private static extern int SetBkMode(IntPtr dc, int mode);
+        [DllImport("gdi32.dll")] private static extern int SetTextColor(IntPtr dc, int color);
+        [DllImport("gdi32.dll")] private static extern bool SetBrushOrgEx(IntPtr dc, int x, int y, IntPtr previous);
+
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { inputFont?.Dispose(); cueFont?.Dispose(); }
+            if (disposing) { ClearFabricBrush(); inputFont?.Dispose(); cueFont?.Dispose(); }
             base.Dispose(disposing);
         }
     }
