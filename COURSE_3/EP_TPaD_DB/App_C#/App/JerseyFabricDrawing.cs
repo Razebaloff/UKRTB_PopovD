@@ -106,19 +106,7 @@ namespace LP_PopovD_App
             }
         }
 
-        internal static float InkLight(float x, float y)
-        {
-            material ??= new Fabric();
-            Fabric fabric = material;
-            float u = fabric.Crop.Left + (x - BodyBounds.X) * fabric.Crop.Width / BodyBounds.Width - .5f;
-            float v = fabric.Crop.Top + (y - BodyBounds.Y) * fabric.Crop.Height / BodyBounds.Height - .5f;
-            fabric.Read(u, v, out float alpha, out float r, out float green, out float b);
-            if (alpha < 16) return 1;
-            float luminance = (r * .2126f + green * .7152f + b * .0722f) * 255 / alpha;
-            return Math.Clamp(.77f + luminance * .01f, .80f, 1.08f);
-        }
-
-        internal static void Draw(Graphics g, RectangleF? viewport)
+        internal static void Draw(Graphics g, RectangleF? viewport, RectangleF[]? fields = null)
         {
             material ??= new Fabric();
             Fabric fabric = material;
@@ -150,6 +138,9 @@ namespace LP_PopovD_App
                             float wx = (left + x + .5f - dx) / sx;
                             float u = fabric.Crop.Left + (wx - BodyBounds.X) * sourceScaleX - .5f;
                             fabric.Read(u, v, out float a, out float r, out float green, out float b);
+                            if (a > 16 && fields != null)
+                                foreach (RectangleF field in fields)
+                                    JerseyFieldDrawing.Shade(wx, wy, Math.Min(sx, sy), field, a, ref r, ref green, ref b);
                             if (a > 16 && detail > 0)
                             {
                                 // Тонкое плетение строится в целевых пикселях, а не увеличивается из PNG.

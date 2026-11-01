@@ -35,7 +35,7 @@ namespace LP_PopovD_App
                 return;
             }
             RectangleF[] inputs = InputBounds(registration);
-            JerseyFabricDrawing.Draw(g, viewport);
+            JerseyFabricDrawing.Draw(g, viewport, inputs);
 
             using Font title = new(RinkTypography.FamilyName, 28, FontStyle.Bold, GraphicsUnit.Pixel);
             using SolidBrush white = new(Color.FromArgb(239, 247, 252));
@@ -52,7 +52,7 @@ namespace LP_PopovD_App
                 ? new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ" }
                 : new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ" };
             for (int i = 0; i < inputs.Length; i++)
-                JerseyFieldDrawing.DrawCue(g, inputs[i], prompts[i], viewport);
+                JerseyFieldDrawing.DrawCue(g, inputs[i], prompts[i]);
             DrawCapsule(g, SubmitBounds, registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : "ВОЙТИ", true);
             DrawCapsule(g, BackBounds, "НАЗАД", false);
         }
