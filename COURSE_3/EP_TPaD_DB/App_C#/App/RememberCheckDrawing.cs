@@ -27,5 +27,5 @@ namespace LP_PopovD_App
             g.DrawString("ЗАПОМНИТЬ МЕНЯ", font ?? fallback, ink,
                 new RectangleF(box.Right + 11 * s, bounds.Y, bounds.Width - side - 15 * s, bounds.Height), format);
         }
-    }
+    }   
 }
