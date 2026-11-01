@@ -5,6 +5,7 @@ namespace LP_PopovD_App
     internal static class StickFeedbackDrawing
     {
         private static readonly PointF Center = new(800, 58);
+        internal static readonly RectangleF AnimationBounds = new(742, -16, 116, 148);
 
         private static float Smooth(float value)
         {
@@ -16,7 +17,8 @@ namespace LP_PopovD_App
         {
             RectangleF c = RinkDrawing.GetCanvasBounds(size);
             float s = c.Width / RinkDrawing.Width;
-            return Rectangle.Ceiling(new RectangleF(c.X + 680 * s, c.Y - 32 * s, 240 * s, 180 * s));
+            return Rectangle.Ceiling(new RectangleF(c.X + AnimationBounds.X * s, c.Y + AnimationBounds.Y * s,
+                AnimationBounds.Width * s, AnimationBounds.Height * s));
         }
 
         internal static void Draw(Graphics g, Size size, float? progress = null, bool fadeAtEnd = false)
@@ -30,15 +32,23 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             g.TranslateTransform(canvas.X, canvas.Y);
             g.ScaleTransform(canvas.Width / RinkDrawing.Width, canvas.Height / RinkDrawing.Height);
-            if (!progress.HasValue || progress.Value <= 0 || (progress.Value >= 1 && !fadeAtEnd))
+            // Ограничивается только прозрачный эффект; фрагмент фона сюда не копируется.
+            g.SetClip(AnimationBounds, CombineMode.Intersect);
+            if (!progress.HasValue)
                 HeaderDrawing.DrawSticks(g);
             else
             {
                 float p = Math.Clamp(progress.Value, 0, 1);
+                if (p <= 0 || p >= 1)
+                {
+                    if (!fadeAtEnd) HeaderDrawing.DrawSticks(g);
+                    g.Restore(saved);
+                    return;
+                }
                 float angle = 360 * Smooth(p);
-                float opacity = fadeAtEnd ? 1 - Smooth((p - .8f) / .2f) : 1;
-                float shrink = 1 - .09f * MathF.Sin(MathF.PI * p);
-                DrawWave(g, p, angle);
+                float opacity = fadeAtEnd ? Smooth(p / .08f) * (1 - Smooth((p - .88f) / .12f)) : 1;
+                float shrink = 1 - .24f * Smooth(p / .14f) * Smooth((1 - p) / .14f);
+                DrawWave(g, p, angle, opacity);
                 float trail = MathF.Sin(MathF.PI * p) * opacity;
                 for (int i = 2; i >= 1; i--)
                 {
@@ -64,14 +74,14 @@ namespace LP_PopovD_App
             g.Restore(saved);
         }
 
-        private static void DrawWave(Graphics g, float progress, float angle)
+        private static void DrawWave(Graphics g, float progress, float angle, float opacity)
         {
             float q = Math.Clamp((progress - .08f) / .92f, 0, 1);
-            float strength = MathF.Sin(MathF.PI * q) * (1 - q);
+            float strength = MathF.Sin(MathF.PI * q) * (1 - q) * opacity;
             if (strength <= .001f) return;
-            float radius = 24 + 72 * (1 - (1 - q) * (1 - q));
+            float radius = 18 + 35 * (1 - (1 - q) * (1 - q));
             RectangleF oval = new(Center.X - radius, Center.Y - radius * .54f, radius * 2, radius * 1.08f);
-            using Pen haze = new(Color.FromArgb((int)(31 * strength), 163, 222, 250), 11 * (1 - q) + 2)
+            using Pen haze = new(Color.FromArgb((int)(31 * strength), 163, 222, 250), 8 * (1 - q) + 1.5f)
                 { StartCap = LineCap.Round, EndCap = LineCap.Round };
             using Pen front = new(Color.FromArgb((int)(143 * strength), 230, 249, 255), 1.8f * (1 - q) + .55f)
                 { StartCap = LineCap.Round, EndCap = LineCap.Round };

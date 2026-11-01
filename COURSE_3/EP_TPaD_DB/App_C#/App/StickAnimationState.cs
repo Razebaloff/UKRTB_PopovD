@@ -2,33 +2,37 @@ namespace LP_PopovD_App
 {
     internal sealed class StickAnimationState
     {
-        internal const int DurationMilliseconds = 560;
-        internal int RemainingTurns { get; private set; }
-        internal bool Active => RemainingTurns > 0;
+        internal const int DurationMilliseconds = 760;
+        private Action? pendingAction;
         private long startedAt = -1;
+        internal bool Active => pendingAction != null;
 
-        internal void QueueTurn() => RemainingTurns++;
-
-        internal void Advance(long now)
+        internal bool TryBegin(Action action)
         {
-            if (!Active) return;
-            // Первый оборот начинается с первого видимого кадра, после подготовки перехода.
-            if (startedAt < 0) { startedAt = now; return; }
-            long completed = Math.Max(0, now - startedAt) / DurationMilliseconds;
-            if (completed >= RemainingTurns) Clear();
-            else
-            {
-                RemainingTurns -= (int)completed;
-                startedAt += completed * DurationMilliseconds;
-            }
+            ArgumentNullException.ThrowIfNull(action);
+            if (Active) return false;
+            pendingAction = action;
+            startedAt = -1;
+            return true;
         }
 
         internal float Progress(long now)
         {
-            Advance(now);
-            return Active ? Math.Clamp((now - startedAt) / (float)DurationMilliseconds, 0, 1) : 1;
+            if (!Active) return 1;
+            // Отсчёт начинается с первого нарисованного кадра.
+            if (startedAt < 0) startedAt = now;
+            return Math.Clamp((now - startedAt) / (float)DurationMilliseconds, 0, 1);
         }
 
-        internal void Clear() { RemainingTurns = 0; startedAt = -1; }
+        internal bool TryFinish(long now, out Action? action)
+        {
+            action = null;
+            if (!Active || startedAt < 0 || now - startedAt < DurationMilliseconds) return false;
+            action = pendingAction;
+            Cancel();
+            return true;
+        }
+
+        internal void Cancel() { pendingAction = null; startedAt = -1; }
     }
 }

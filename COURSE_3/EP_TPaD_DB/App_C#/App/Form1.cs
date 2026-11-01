@@ -19,7 +19,9 @@ namespace LP_PopovD_App
         private readonly System.Windows.Forms.Timer stickTimer;
         private readonly Stopwatch stickClock = Stopwatch.StartNew();
         private readonly StickAnimationState stickAnimation = new();
-        private bool capturingScene;
+        private Bitmap? stickBackdrop;
+        private Button? feedbackSource;
+        private readonly List<Control> feedbackDisabledControls = new();
         private readonly CapsuleInput loginInput;
         private readonly CapsuleInput passwordInput;
         private readonly CapsuleInput emailInput;
@@ -45,9 +47,16 @@ namespace LP_PopovD_App
             stickTimer = new System.Windows.Forms.Timer(components!) { Interval = 15 };
             stickTimer.Tick += (_, _) =>
             {
-                stickAnimation.Advance(stickClock.ElapsedMilliseconds);
-                if (!stickAnimation.Active) stickTimer.Stop();
-                Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize));
+                if (stickAnimation.TryFinish(stickClock.ElapsedMilliseconds, out Action? action))
+                {
+                    stickTimer.Stop();
+                    RestoreFeedbackControls();
+                    // Сначала показываем полный конечный кадр, затем вызываем действие кнопки.
+                    Invalidate(true);
+                    Update();
+                    action?.Invoke();
+                }
+                else Invalidate();
             };
             loginInput = new CapsuleInput("Логин", "ВВЕДИТЕ ЛОГИН") { TabIndex = 0 };
             passwordInput = new CapsuleInput("Пароль", "ВВЕДИТЕ ПАРОЛЬ", password: true, maxLength: 128) { TabIndex = 1 };
@@ -61,15 +70,10 @@ namespace LP_PopovD_App
             }
             // Click охватывает мышь, Enter и Space; одна подписка на каждую кнопку.
             foreach (Control control in Controls)
-                if (control is Button button) button.Click += StartStickFeedback;
+                if (control is Button button) button.Click += HandleAnimatedButtonClick;
             loginInput.ValueChanged += ClearStatus;
             passwordInput.ValueChanged += ClearStatus;
             emailInput.ValueChanged += ClearStatus;
-            entryButton.Click += (_, _) => Navigate(AppScreen.Login, Center(entryButton));
-            registrationButton.Click += (_, _) => Navigate(AppScreen.Registration, Center(registrationButton));
-            entryScheduleButton.Click += (_, _) => Navigate(AppScreen.Menu, Center(entryScheduleButton), true);
-            backButton.Click += (_, _) => Navigate(AppScreen.Entry, Center(backButton));
-            submitButton.Click += SubmitAuth;
             LayoutSceneControls();
             ShowScreenControls();
         }
@@ -101,24 +105,47 @@ namespace LP_PopovD_App
                 float progress = Math.Clamp(transitionClock.ElapsedMilliseconds /
                     (float)TransitionDrawing.DurationMilliseconds, 0, 1);
                 TransitionDrawing.Draw(e.Graphics, ClientSize, transitionFrom, transitionTo, transitionOrigin, progress);
+                return; // Переход использует полный кадр, без неподвижного слоя поверх него.
             }
-            else PaintScene(e.Graphics, ClientRectangle);
-            if (!capturingScene)
-            {
-                float progress = stickAnimation.Progress(stickClock.ElapsedMilliseconds);
-                if (stickAnimation.Active)
-                    StickFeedbackDrawing.Draw(e.Graphics, ClientSize, progress, fadeAtEnd: screen == AppScreen.Menu);
-                else if (screen != AppScreen.Menu)
-                    StickFeedbackDrawing.Draw(e.Graphics, ClientSize);
-            }
+            PaintScene(e.Graphics, ClientRectangle);
+            if (stickAnimation.Active)
+                StickFeedbackDrawing.Draw(e.Graphics, ClientSize, stickAnimation.Progress(stickClock.ElapsedMilliseconds),
+                    fadeAtEnd: screen == AppScreen.Menu);
         }
 
-        private void StartStickFeedback(object? sender, EventArgs e)
+        private void HandleAnimatedButtonClick(object? sender, EventArgs e)
         {
-            stickAnimation.Advance(stickClock.ElapsedMilliseconds);
-            stickAnimation.QueueTurn();
+            if (sender is not Button button || stickAnimation.Active || transitionFrom != null) return;
+            Action action = () => { }; // Кнопки главного меню пока остаются прототипом.
+            if (button == entryButton) action = () => Navigate(AppScreen.Login, Center(button));
+            else if (button == registrationButton) action = () => Navigate(AppScreen.Registration, Center(button));
+            else if (button == entryScheduleButton) action = () => Navigate(AppScreen.Menu, Center(button), true);
+            else if (button == backButton) action = () => Navigate(AppScreen.Entry, Center(button));
+            else if (button == submitButton) action = () => SubmitAuth(button, EventArgs.Empty);
+            if (!stickAnimation.TryBegin(action)) return;
+            feedbackSource = button;
+            foreach (Control control in Controls)
+                if (control.Visible && control.Enabled) feedbackDisabledControls.Add(control);
+            foreach (Control control in feedbackDisabledControls) control.Enabled = false;
             stickTimer.Start();
-            Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize));
+            Invalidate(true);
+        }
+
+        private void RestoreFeedbackControls()
+        {
+            foreach (Control control in feedbackDisabledControls)
+                if (!control.IsDisposed) control.Enabled = true;
+            feedbackDisabledControls.Clear();
+            if (feedbackSource?.CanFocus == true) feedbackSource.Focus();
+            feedbackSource = null;
+        }
+
+        private void CancelButtonAnimation()
+        {
+            stickTimer.Stop();
+            stickAnimation.Cancel();
+            RestoreFeedbackControls();
+            Invalidate(true);
         }
 
         internal void PaintScene(Graphics graphics) => PaintScene(graphics, ClientRectangle);
@@ -126,17 +153,21 @@ namespace LP_PopovD_App
         internal void PaintScene(Graphics graphics, Rectangle sourceBounds)
         {
             if (ClientSize.Width < 1 || ClientSize.Height < 1) return;
-            if (sceneCache == null)
+            bool spinning = stickAnimation.Active;
+            Bitmap? background = spinning ? stickBackdrop : sceneCache;
+            if (background == null)
             {
-                sceneCache = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
-                sceneCache.SetResolution(96, 96);
-                using Graphics g = Graphics.FromImage(sceneCache);
-                SceneDrawing.Draw(g, ClientSize, screen, includeControls: false, status: authStatus, includeSticks: false);
+                background = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
+                background.SetResolution(96, 96);
+                using Graphics g = Graphics.FromImage(background);
+                SceneDrawing.Draw(g, ClientSize, screen, includeControls: false, status: authStatus, includeSticks: !spinning);
+                if (spinning) stickBackdrop = background;
+                else sceneCache = background;
             }
             GraphicsState state = graphics.Save();
             graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
             graphics.PixelOffsetMode = PixelOffsetMode.None;
-            graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size),
+            graphics.DrawImage(background, new Rectangle(Point.Empty, sourceBounds.Size),
                 sourceBounds, GraphicsUnit.Pixel);
             graphics.Restore(state);
         }
@@ -144,6 +175,7 @@ namespace LP_PopovD_App
         private void ClearSceneCache()
         {
             sceneCache?.Dispose(); sceneCache = null;
+            stickBackdrop?.Dispose(); stickBackdrop = null;
             foreach (Control control in Controls)
                 if (control is CapsuleInput field) field.RefreshFabric();
         }
@@ -154,7 +186,7 @@ namespace LP_PopovD_App
             transitionFrom?.Dispose();
             transitionTo?.Dispose();
             transitionFrom = transitionTo = null;
-            stickAnimation.Clear();
+            stickAnimation.Cancel();
             stickClock.Stop();
         }
 
@@ -224,8 +256,6 @@ namespace LP_PopovD_App
         {
             Bitmap image = new(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
             image.SetResolution(96, 96);
-            bool previousCapture = capturingScene;
-            capturingScene = true;
             try
             {
                 DrawToBitmap(image, ClientRectangle);
@@ -235,14 +265,13 @@ namespace LP_PopovD_App
             {
                 image.Dispose();
                 // Резервная отрисовка не читает и не сохраняет введённый пароль.
-                return SceneDrawing.Render(ClientSize, screen, includeSticks: false);
+                return SceneDrawing.Render(ClientSize, screen);
             }
-            finally { capturingScene = previousCapture; }
         }
 
         private void Navigate(AppScreen target, PointF origin, bool focusSchedule = false)
         {
-            if (transitionFrom != null || screen == target || ClientSize.Width < 1 || ClientSize.Height < 1) return;
+            if (stickAnimation.Active || transitionFrom != null || screen == target || ClientSize.Width < 1 || ClientSize.Height < 1) return;
             Bitmap before = CaptureScreen();
             HideScreenControls();
             ActiveControl = null;
@@ -334,7 +363,8 @@ namespace LP_PopovD_App
         {
             if (e.KeyCode == Keys.Escape)
             {
-                if (transitionFrom != null) FinishTransition();
+                if (stickAnimation.Active) CancelButtonAnimation();
+                else if (transitionFrom != null) FinishTransition();
                 else if (screen != AppScreen.Entry) Navigate(AppScreen.Entry, Center(backButton));
                 else Close();
                 e.Handled = e.SuppressKeyPress = true;
@@ -354,7 +384,7 @@ namespace LP_PopovD_App
 
         private async void ExportCurrentScreen()
         {
-            if (exporting || transitionFrom != null) return;
+            if (exporting || stickAnimation.Active || transitionFrom != null) return;
             AppScreen exportScreen = screen;
             using SaveFileDialog dialog = new()
             {
@@ -409,7 +439,7 @@ namespace LP_PopovD_App
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             transitionTimer.Stop();
-            stickTimer.Stop();
+            CancelButtonAnimation();
             base.OnFormClosing(e);
         }
     }
