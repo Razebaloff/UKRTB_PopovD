@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="SceneCacheChecks.cs" />
+    <Compile Remove="SceneCacheChecks.cs;WinFormsChecks.cs" />
     <Compile Include="../App/AuthInputRules.cs" Link="AuthInputRules.cs" />
     <Compile Include="../App/LoginFlowState.cs" Link="LoginFlowState.cs" />
     <Compile Include="../App/RememberedLoginStore.cs" Link="RememberedLoginStore.cs" />

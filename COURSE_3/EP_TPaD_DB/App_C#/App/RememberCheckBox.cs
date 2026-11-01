@@ -6,6 +6,7 @@ namespace LP_PopovD_App
     internal sealed class RememberCheckBox : CheckBox
     {
         private Font? labelFont;
+        private float fontPixels;
         private bool hovered;
         protected override bool ShowFocusCues => false;
 
@@ -22,9 +23,15 @@ namespace LP_PopovD_App
 
         internal void SetScale(float scale)
         {
+            float pixels = Math.Max(12, 17 * scale);
+            // Control.Font сравнивает значения шрифтов и может оставить прежний объект.
+            // При том же размере сохраняем его живым, как у остальных элементов формы.
+            if (labelFont != null && Math.Abs(pixels - fontPixels) < .05f) return;
             Font? old = labelFont;
-            labelFont = new Font(RinkTypography.FamilyName, Math.Max(12, 17 * scale), FontStyle.Bold, GraphicsUnit.Pixel);
-            Font = labelFont;
+            Font replacement = new(RinkTypography.FamilyName, pixels, FontStyle.Bold, GraphicsUnit.Pixel);
+            Font = replacement;
+            labelFont = replacement;
+            fontPixels = pixels;
             old?.Dispose();
         }
 
