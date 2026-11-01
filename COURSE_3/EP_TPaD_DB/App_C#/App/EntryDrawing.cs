@@ -9,9 +9,9 @@ namespace LP_PopovD_App
         internal static readonly PointF[] PuckCenters = { new(400, 350), new(1200, 350), new(800, 605) };
         internal static readonly string[] Captions = { "ВОЙТИ", "ЗАРЕГИСТРИРОВАТЬСЯ", "РАСПИСАНИЕ" };
 
-        internal static void Draw(Graphics g, RectangleF? viewport = null)
+        internal static void Draw(Graphics g, RectangleF? viewport = null, bool includeSticks = true)
         {
-            HeaderDrawing.Draw(g, viewport);
+            HeaderDrawing.Draw(g, viewport, includeSticks);
             foreach (PointF center in PuckCenters)
             {
                 if (viewport.HasValue && !viewport.Value.IntersectsWith(new RectangleF(center.X - 190, center.Y - 190, 380, 400))) continue;

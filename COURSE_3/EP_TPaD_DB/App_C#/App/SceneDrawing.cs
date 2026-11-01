@@ -5,7 +5,7 @@ namespace LP_PopovD_App
 {
     internal static class SceneDrawing
     {
-        internal static Bitmap Render(Size size, AppScreen screen)
+        internal static Bitmap Render(Size size, AppScreen screen, bool includeSticks = true)
         {
             Bitmap result = new(size.Width, size.Height, PixelFormat.Format24bppRgb);
             result.SetResolution(96, 96);
@@ -21,7 +21,7 @@ namespace LP_PopovD_App
                     {
                         Rectangle region = new(x, y, Math.Min(tileSize, size.Width - x), Math.Min(tileSize, size.Height - y));
                         using Bitmap ice = NativeIceDrawing.RenderRegion(size, region);
-                        using Bitmap tile = RenderBand(size, region, screen, ice);
+                        using Bitmap tile = RenderBand(size, region, screen, ice, includeSticks);
                         output.DrawImage(tile, new Rectangle(x, y, tile.Width, tile.Height),
                             0, 0, tile.Width, tile.Height, GraphicsUnit.Pixel);
                     }
@@ -30,7 +30,7 @@ namespace LP_PopovD_App
             catch { result.Dispose(); throw; }
         }
 
-        internal static void Draw(Graphics g, Size size, AppScreen screen, bool includeControls = false, string status = "")
+        internal static void Draw(Graphics g, Size size, AppScreen screen, bool includeControls = false, string status = "", bool includeSticks = true)
         {
             GraphicsState saved = g.Save();
             g.Clear(Color.FromArgb(137, 177, 202));
@@ -39,11 +39,11 @@ namespace LP_PopovD_App
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             NativeIceDrawing.Draw(g, size);
-            DrawContents(g, size, screen, includeControls, status);
+            DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks);
             g.Restore(saved);
         }
 
-        internal static Bitmap RenderBand(Size size, Rectangle region, AppScreen screen, Bitmap ice)
+        internal static Bitmap RenderBand(Size size, Rectangle region, AppScreen screen, Bitmap ice, bool includeSticks = true)
         {
             if (ice.Size != region.Size) throw new ArgumentException("Размер фона не совпадает с полосой.", nameof(ice));
             Bitmap band = new(region.Width, region.Height, PixelFormat.Format24bppRgb);
@@ -59,14 +59,14 @@ namespace LP_PopovD_App
                 g.CompositingQuality = CompositingQuality.HighQuality;
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.TranslateTransform(-region.X, -region.Y);
-                DrawContents(g, size, screen, true, "", region);
+                DrawContents(g, size, screen, true, "", region, includeSticks);
                 return band;
             }
             catch { band.Dispose(); throw; }
         }
 
         private static void DrawContents(Graphics g, Size size, AppScreen screen, bool includeControls,
-            string status, Rectangle? pixelViewport = null)
+            string status, Rectangle? pixelViewport = null, bool includeSticks = true)
         {
             GraphicsState saved = g.Save();
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
@@ -79,7 +79,7 @@ namespace LP_PopovD_App
             switch (screen)
             {
                 case AppScreen.Entry:
-                    EntryDrawing.Draw(g, viewport);
+                    EntryDrawing.Draw(g, viewport, includeSticks);
                     if (includeControls)
                         for (int i = 0; i < EntryDrawing.Captions.Length; i++)
                         {
@@ -91,7 +91,7 @@ namespace LP_PopovD_App
                     break;
                 case AppScreen.Login:
                 case AppScreen.Registration:
-                    JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport);
+                    JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks);
                     break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);

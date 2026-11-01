@@ -16,6 +16,10 @@ namespace LP_PopovD_App
         private PointF transitionOrigin;
         private readonly Stopwatch transitionClock = new();
         private readonly System.Windows.Forms.Timer transitionTimer;
+        private readonly System.Windows.Forms.Timer stickTimer;
+        private readonly Stopwatch stickClock = Stopwatch.StartNew();
+        private readonly StickAnimationState stickAnimation = new();
+        private bool capturingScene;
         private readonly CapsuleInput loginInput;
         private readonly CapsuleInput passwordInput;
         private readonly CapsuleInput emailInput;
@@ -38,6 +42,13 @@ namespace LP_PopovD_App
                     FinishTransition();
                 else Invalidate();
             };
+            stickTimer = new System.Windows.Forms.Timer(components!) { Interval = 15 };
+            stickTimer.Tick += (_, _) =>
+            {
+                stickAnimation.Advance(stickClock.ElapsedMilliseconds);
+                if (!stickAnimation.Active) stickTimer.Stop();
+                Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize));
+            };
             loginInput = new CapsuleInput("Логин", "ВВЕДИТЕ ЛОГИН") { TabIndex = 0 };
             passwordInput = new CapsuleInput("Пароль", "ВВЕДИТЕ ПАРОЛЬ", password: true, maxLength: 128) { TabIndex = 1 };
             emailInput = new CapsuleInput("Электронная почта", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ", maxLength: 254) { TabIndex = 2 };
@@ -48,6 +59,9 @@ namespace LP_PopovD_App
                 control.Visible = false;
                 Controls.Add(control);
             }
+            // Click охватывает мышь, Enter и Space; одна подписка на каждую кнопку.
+            foreach (Control control in Controls)
+                if (control is Button button) button.Click += StartStickFeedback;
             loginInput.ValueChanged += ClearStatus;
             passwordInput.ValueChanged += ClearStatus;
             emailInput.ValueChanged += ClearStatus;
@@ -89,6 +103,22 @@ namespace LP_PopovD_App
                 TransitionDrawing.Draw(e.Graphics, ClientSize, transitionFrom, transitionTo, transitionOrigin, progress);
             }
             else PaintScene(e.Graphics, ClientRectangle);
+            if (!capturingScene)
+            {
+                float progress = stickAnimation.Progress(stickClock.ElapsedMilliseconds);
+                if (stickAnimation.Active)
+                    StickFeedbackDrawing.Draw(e.Graphics, ClientSize, progress, fadeAtEnd: screen == AppScreen.Menu);
+                else if (screen != AppScreen.Menu)
+                    StickFeedbackDrawing.Draw(e.Graphics, ClientSize);
+            }
+        }
+
+        private void StartStickFeedback(object? sender, EventArgs e)
+        {
+            stickAnimation.Advance(stickClock.ElapsedMilliseconds);
+            stickAnimation.QueueTurn();
+            stickTimer.Start();
+            Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize));
         }
 
         internal void PaintScene(Graphics graphics) => PaintScene(graphics, ClientRectangle);
@@ -101,7 +131,7 @@ namespace LP_PopovD_App
                 sceneCache = new Bitmap(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
                 sceneCache.SetResolution(96, 96);
                 using Graphics g = Graphics.FromImage(sceneCache);
-                SceneDrawing.Draw(g, ClientSize, screen, includeControls: false, status: authStatus);
+                SceneDrawing.Draw(g, ClientSize, screen, includeControls: false, status: authStatus, includeSticks: false);
             }
             GraphicsState state = graphics.Save();
             graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
@@ -124,6 +154,8 @@ namespace LP_PopovD_App
             transitionFrom?.Dispose();
             transitionTo?.Dispose();
             transitionFrom = transitionTo = null;
+            stickAnimation.Clear();
+            stickClock.Stop();
         }
 
         private Rectangle ToPixels(RectangleF bounds)
@@ -192,6 +224,8 @@ namespace LP_PopovD_App
         {
             Bitmap image = new(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
             image.SetResolution(96, 96);
+            bool previousCapture = capturingScene;
+            capturingScene = true;
             try
             {
                 DrawToBitmap(image, ClientRectangle);
@@ -201,8 +235,9 @@ namespace LP_PopovD_App
             {
                 image.Dispose();
                 // Резервная отрисовка не читает и не сохраняет введённый пароль.
-                return SceneDrawing.Render(ClientSize, screen);
+                return SceneDrawing.Render(ClientSize, screen, includeSticks: false);
             }
+            finally { capturingScene = previousCapture; }
         }
 
         private void Navigate(AppScreen target, PointF origin, bool focusSchedule = false)
@@ -374,6 +409,7 @@ namespace LP_PopovD_App
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             transitionTimer.Stop();
+            stickTimer.Stop();
             base.OnFormClosing(e);
         }
     }

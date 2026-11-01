@@ -25,9 +25,9 @@ namespace LP_PopovD_App
             return path;
         }
 
-        internal static void Draw(Graphics g, bool registration, bool includeControls, string status = "", RectangleF? viewport = null)
+        internal static void Draw(Graphics g, bool registration, bool includeControls, string status = "", RectangleF? viewport = null, bool includeSticks = true)
         {
-            HeaderDrawing.Draw(g, viewport);
+            HeaderDrawing.Draw(g, viewport, includeSticks);
             if (viewport.HasValue && !viewport.Value.IntersectsWith(JerseyFabricDrawing.PaintBounds))
             {
                 if (includeControls && viewport.Value.IntersectsWith(new RectangleF(49, 187, 180, 58)))

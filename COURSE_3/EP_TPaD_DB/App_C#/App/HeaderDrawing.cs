@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
@@ -7,7 +8,7 @@ namespace LP_PopovD_App
         internal static readonly string[] LeftClubs = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
         internal static readonly string[] RightClubs = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
 
-        internal static void Draw(Graphics g, RectangleF? viewport = null)
+        internal static void Draw(Graphics g, RectangleF? viewport = null, bool includeSticks = true)
         {
             if (viewport.HasValue && !viewport.Value.IntersectsWith(new RectangleF(0, 0, 1600, 185))) return;
             // Эмблемы и флаги лежат на одной горизонтальной оси (Y = 60).
@@ -18,7 +19,7 @@ namespace LP_PopovD_App
             }
             DrawFlag(g, new RectangleF(632, 28, 106, 64), true);
             DrawFlag(g, new RectangleF(862, 28, 106, 64), false);
-            DrawSticks(g);
+            if (includeSticks) DrawSticks(g);
             using Font title = new(RinkTypography.FamilyName, 42, FontStyle.Bold, GraphicsUnit.Pixel);
             using StringFormat format = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             using SolidBrush halo = new(Color.FromArgb(200, 239, 250, 255));
@@ -70,26 +71,42 @@ namespace LP_PopovD_App
             DrawImageFit(g, ArtworkResources.GetEmblem(name), new RectangleF(centerX - 44, 20, 88, 80));
         }
 
-        private static void DrawSticks(Graphics g)
+        internal static void DrawSticks(Graphics g)
+        {
+            DrawStick(g, false);
+            DrawStick(g, true);
+        }
+
+        internal static void DrawStick(Graphics g, bool mirrored, float opacity = 1)
         {
             // Готовая фотография настоящей клюшки. Отражённая пара соприкасается перьями снизу.
             Image stick = ArtworkResources.Get("HockeyStick");
             RectangleF bounds = new(750, 8, 100, 100);
-            DrawImageFit(g, stick, bounds);
             GraphicsState state = g.Save();
-            g.TranslateTransform(1600, 0);
-            g.ScaleTransform(-1, 1);
-            DrawImageFit(g, stick, bounds);
+            if (mirrored)
+            {
+                g.TranslateTransform(1600, 0);
+                g.ScaleTransform(-1, 1);
+            }
+            DrawImageFit(g, stick, bounds, opacity);
             g.Restore(state);
         }
 
-        private static void DrawImageFit(Graphics g, Image image, RectangleF bounds)
+        private static void DrawImageFit(Graphics g, Image image, RectangleF bounds, float opacity = 1)
         {
             float scale = Math.Min(bounds.Width / image.Width, bounds.Height / image.Height);
             float width = image.Width * scale, height = image.Height * scale;
             RectangleF destination = new(bounds.X + (bounds.Width - width) / 2,
                 bounds.Y + (bounds.Height - height) / 2, width, height);
-            g.DrawImage(image, destination, new RectangleF(0, 0, image.Width, image.Height), GraphicsUnit.Pixel);
+            RectangleF source = new(0, 0, image.Width, image.Height);
+            if (opacity >= 1) g.DrawImage(image, destination, source, GraphicsUnit.Pixel);
+            else if (opacity > 0)
+            {
+                using ImageAttributes attributes = new();
+                attributes.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(opacity, 0, 1) });
+                g.DrawImage(image, Rectangle.Round(destination), 0, 0, image.Width, image.Height,
+                    GraphicsUnit.Pixel, attributes);
+            }
         }
     }
 }
