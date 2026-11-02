@@ -4,7 +4,8 @@ using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
-    // Фоновый иней появляется и тает циклически даже без наведения.
+    // На всех кнопках фоновый иней появляется и тает синхронно,
+    // по общему монотонному времени без индивидуального фазового сдвига.
     // При hover фон уступает место плотной прозрачной ледяной корке.
     internal sealed class FrostHoverAnimation : IDisposable
     {
@@ -14,8 +15,6 @@ namespace LP_PopovD_App
         private readonly Action invalidate;
         private float from, target;
         private bool active;
-        private readonly float phase;
-        private static int nextPhase;
 
         internal float Amount { get; private set; }
         internal float Ambient
@@ -23,8 +22,7 @@ namespace LP_PopovD_App
             get
             {
                 if (!active) return 0;
-                float t = (float)((sharedTime.Elapsed.TotalSeconds +
-                    phase * 6.6) % 6.6) / 6.6f;
+                float t = (float)(sharedTime.Elapsed.TotalSeconds % 6.6) / 6.6f;
                 // Замерзание, непродолжительное удержание, таяние и пауза.
                 return t < .34f ? .80f * SnowDrawing.Smooth(t / .34f)
                     : t < .48f ? .80f
@@ -36,7 +34,6 @@ namespace LP_PopovD_App
         internal FrostHoverAnimation(Action invalidate)
         {
             this.invalidate = invalidate;
-            phase = (System.Threading.Interlocked.Increment(ref nextPhase) * .173f) % 1f;
             timer = new System.Windows.Forms.Timer { Interval = 65 };
             timer.Tick += (_, _) => Tick();
         }
