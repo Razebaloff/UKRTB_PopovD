@@ -4,58 +4,79 @@ using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
-    // Один короткий таймер на активный hover, не перерисовывает лёд или резину.
+    // Фоновый иней появляется и тает циклически даже без наведения.
+    // При hover фон уступает место плотной прозрачной ледяной корке.
     internal sealed class FrostHoverAnimation : IDisposable
     {
+        private static readonly Stopwatch sharedTime = Stopwatch.StartNew();
         private readonly System.Windows.Forms.Timer timer;
-        private readonly Stopwatch clock = new();
+        private readonly Stopwatch transition = new();
         private readonly Action invalidate;
         private float from, target;
+        private bool active;
+        private readonly float phase;
+        private static int nextPhase;
 
         internal float Amount { get; private set; }
+        internal float Ambient
+        {
+            get
+            {
+                if (!active) return 0;
+                float t = (float)((sharedTime.Elapsed.TotalSeconds +
+                    phase * 6.6) % 6.6) / 6.6f;
+                // Замерзание, непродолжительное удержание, таяние и пауза.
+                return t < .34f ? .80f * SnowDrawing.Smooth(t / .34f)
+                    : t < .48f ? .80f
+                    : t < .80f ? .80f * (1 - SnowDrawing.Smooth((t - .48f) / .32f))
+                    : 0f;
+            }
+        }
 
         internal FrostHoverAnimation(Action invalidate)
         {
             this.invalidate = invalidate;
-            timer = new System.Windows.Forms.Timer { Interval = 16 };
+            phase = (System.Threading.Interlocked.Increment(ref nextPhase) * .173f) % 1f;
+            timer = new System.Windows.Forms.Timer { Interval = 65 };
             timer.Tick += (_, _) => Tick();
+        }
+
+        internal void SetVisible(bool visible)
+        {
+            if (active == visible) return;
+            active = visible;
+            if (visible) timer.Start();
+            else { timer.Stop(); Reset(); }
         }
 
         internal void SetTarget(bool hovered)
         {
             float next = hovered ? 1 : 0;
             if (Math.Abs(target - next) < .001f) return;
-            TickAmount();
+            UpdateAmount();
             from = Amount;
             target = next;
-            clock.Restart();
-            timer.Start();
+            transition.Restart();
             invalidate();
         }
 
-        private void TickAmount()
+        private void UpdateAmount()
         {
-            if (!clock.IsRunning) return;
-            float p = Math.Clamp((float)(clock.Elapsed.TotalMilliseconds / 285.0), 0, 1);
+            if (!transition.IsRunning) return;
+            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 340f), 0, 1);
             Amount = from + (target - from) * SnowDrawing.Smooth(p);
-            if (p >= 1)
-            {
-                Amount = target;
-                timer.Stop();
-                clock.Reset();
-            }
+            if (p >= 1) { Amount = target; transition.Reset(); }
         }
 
         private void Tick()
         {
-            TickAmount();
+            UpdateAmount();
             invalidate();
         }
 
         internal void Reset()
         {
-            timer.Stop();
-            clock.Reset();
+            transition.Reset();
             Amount = from = target = 0;
         }
 
@@ -235,6 +256,46 @@ namespace LP_PopovD_App
                     Paint();
                     g.Restore(islandState);
                 }
+            }
+            g.Restore(saved);
+        }
+
+        // При наведении создаётся голубоватая полупрозрачная ледяная корка:
+        // фактура кристаллов, блестящий обод, хаотичные внутренние трещинки.
+        // Контрастный текст рисуется родительской кнопкой ПОСЛЕ этого слоя.
+        internal static void DrawIceShell(Graphics g, Bitmap texture, Rectangle bounds, float opacity, bool round)
+        {
+            if (opacity < .002f || bounds.Width < 5 || bounds.Height < 5) return;
+            float p = SnowDrawing.Smooth(opacity);
+            GraphicsState saved = g.Save();
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            RectangleF outer = new(bounds.Left + 1, bounds.Top + 1, bounds.Width - 2, bounds.Height - 2);
+            using GraphicsPath shape = Shape(outer, round);
+            g.SetClip(shape, CombineMode.Intersect);
+            using LinearGradientBrush ice = new(outer,
+                Color.FromArgb((int)(145 * p), 184, 229, 252),
+                Color.FromArgb((int)(85 * p), 101, 177, 217), 38);
+            g.FillPath(ice, shape);
+            using ImageAttributes alpha = new();
+            alpha.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(.88f * p, 0, 1) });
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height, GraphicsUnit.Pixel, alpha);
+            using Pen edge = new(Color.FromArgb((int)(200 * p), 245, 252, 255),
+                Math.Max(1f, bounds.Height * .018f)) { LineJoin = LineJoin.Round };
+            g.DrawPath(edge, shape);
+            Random random = new(unchecked(bounds.Width * 1567 + bounds.Height * 1163 + (round ? 7291 : 113)));
+            using Pen fracture = new(Color.White, .8f);
+            int count = round ? 19 : 12;
+            for (int i = 0; i < count; i++)
+            {
+                float x = bounds.Left + random.NextSingle() * bounds.Width;
+                float y = bounds.Top + random.NextSingle() * bounds.Height;
+                float angle = random.NextSingle() * MathF.Tau;
+                float reach = (round ? bounds.Width : bounds.Height) *
+                    (.025f + random.NextSingle() * .09f);
+                fracture.Color = Color.FromArgb((int)((35 + random.Next(90)) * p), 244, 252, 255);
+                g.DrawLine(fracture, x, y, x + MathF.Cos(angle) * reach,
+                    y + MathF.Sin(angle) * reach);
             }
             g.Restore(saved);
         }
