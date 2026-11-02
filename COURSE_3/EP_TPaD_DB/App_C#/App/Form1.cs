@@ -281,7 +281,10 @@ namespace LP_PopovD_App
             graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
-            if (screen != AppScreen.Menu && !withoutSticks)
+            // Для небольших кнопок вдали от заголовка не перерисовываем
+            // клюшки: фоновая сцена берётся из готового bitmap-кэша.
+            if (screen != AppScreen.Menu && !withoutSticks &&
+                sourceBounds.IntersectsWith(StickFeedbackDrawing.PixelBounds(ClientSize)))
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
             {
