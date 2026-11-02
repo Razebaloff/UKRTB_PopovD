@@ -54,7 +54,16 @@ namespace LP_PopovD_App
             using StringFormat center = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             g.FillPath(fill, shape);
             g.DrawPath(edge, shape);
-            g.DrawString(Text, Font, ink, ClientRectangle, center);
+            // Длинная надпись должна полностью помещаться в овальную кнопку.
+            float measured = g.MeasureString(Text, Font, Width, center).Width;
+            if (measured > Width - 20)
+            {
+                using Font fitted = new(RinkTypography.FamilyName,
+                    Math.Max(11, Font.Size * (Width - 20) / Math.Max(1, measured)),
+                    FontStyle.Bold, GraphicsUnit.Pixel);
+                g.DrawString(Text, fitted, ink, ClientRectangle, center);
+            }
+            else g.DrawString(Text, Font, ink, ClientRectangle, center);
         }
         protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; Invalidate(); base.OnMouseLeave(e); }
