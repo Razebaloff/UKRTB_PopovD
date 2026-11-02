@@ -7,6 +7,9 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
+        private Bitmap? buttonLayer;
+        private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
+        protected override bool ShowFocusCues => false;
 
         public RinkMenuButton()
         {
@@ -49,8 +52,23 @@ namespace LP_PopovD_App
                 using SolidBrush background = new(Parent?.BackColor ?? Color.FromArgb(225, 241, 250));
                 g.FillRectangle(background, ClientRectangle);
             }
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            DrawButton(g, hovered, pressed, Focused && ShowFocusCues);
+            if (Width < 1 || Height < 1)
+                return;
+            var key = (ClientSize, Text, ForeColor.ToArgb(), hovered, pressed, Focused);
+            if (buttonLayer == null || key != layerKey)
+            {
+                buttonLayer?.Dispose();
+                buttonLayer = new Bitmap(Width, Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                buttonLayer.SetResolution(96, 96);
+                using Graphics detail = Graphics.FromImage(buttonLayer);
+                detail.SmoothingMode = SmoothingMode.AntiAlias;
+                detail.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                DrawButton(detail, hovered, pressed, Focused);
+                layerKey = key;
+            }
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -122,6 +140,12 @@ namespace LP_PopovD_App
             pressed = false;
             Invalidate();
             base.OnKeyUp(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) buttonLayer?.Dispose();
+            base.Dispose(disposing);
         }
     }
 }

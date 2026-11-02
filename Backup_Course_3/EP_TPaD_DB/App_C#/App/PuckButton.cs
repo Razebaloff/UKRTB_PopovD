@@ -4,14 +4,17 @@ namespace LP_PopovD_App
     {
         public PuckButton()
         {
-            Text = "Войти или\nзарегистрироваться";
-            AccessibleName = "Войти или зарегистрироваться";
-            ForeColor = Color.FromArgb(242, 249, 255);
+            Text = "ВОЙТИ";
+            AccessibleName = "Войти";
+            ForeColor = Color.White;
         }
+
+        // Фокус обозначается оттенком резины, без стандартной пунктирной рамки Windows.
+        protected override bool ShowFocusCues => false;
 
         protected override void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
         {
-            EntryDrawing.DrawPuck(g, ClientRectangle, Text, hovered || focused, pressed);
+            EntryDrawing.DrawPuck(g, ClientRectangle, Text, hovered || Focused, pressed);
         }
     }
 }
