@@ -9,6 +9,9 @@ namespace LP_PopovD_App
         private bool pressed;
         private Font? labelFont;
         private float fontPixels;
+        private readonly FrostHoverAnimation frost;
+        private Bitmap? frostTexture;
+        private Size frostTextureSize;
         [DefaultValue(false)]
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
@@ -22,6 +25,7 @@ namespace LP_PopovD_App
             Cursor = Cursors.Hand;
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
+            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
         }
         internal void SetScale(float scale)
         {
@@ -33,6 +37,20 @@ namespace LP_PopovD_App
             Font = labelFont;
             old?.Dispose();
         }
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            frostTexture?.Dispose();
+            frostTexture = null;
+            frostTextureSize = Size.Empty;
+        }
+
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            if (!Visible) frost?.Reset();
+            base.OnVisibleChanged(e);
+        }
+
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             if (Parent is Form1 form) form.PaintScene(e.Graphics, Bounds);
@@ -54,6 +72,18 @@ namespace LP_PopovD_App
             using StringFormat center = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             g.FillPath(fill, shape);
             g.DrawPath(edge, shape);
+            // Сначала нарастает иней по краям овальной тканевой вставки,
+            // затем поверх него остаётся хорошо читаемая надпись.
+            if (frost.Amount > .002f)
+            {
+                if (frostTexture == null || frostTextureSize != ClientSize)
+                {
+                    frostTexture?.Dispose();
+                    frostTextureSize = ClientSize;
+                    frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
+                }
+                FrostDrawing.Draw(g, frostTexture, ClientRectangle, frost.Amount, false);
+            }
             // Длинная надпись должна полностью помещаться в овальную кнопку.
             float measured = g.MeasureString(Text, Font, new PointF(0, 0), center).Width;
             if (measured > Width - 20)
@@ -65,12 +95,21 @@ namespace LP_PopovD_App
             }
             else g.DrawString(Text, Font, ink, ClientRectangle, center);
         }
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = e.Button == MouseButtons.Left; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
         protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
-        protected override void Dispose(bool disposing) { if (disposing) labelFont?.Dispose(); base.Dispose(disposing); }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                frost?.Dispose();
+                frostTexture?.Dispose();
+                labelFont?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 }
