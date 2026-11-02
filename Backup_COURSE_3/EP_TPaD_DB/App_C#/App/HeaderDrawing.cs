@@ -5,7 +5,7 @@ namespace LP_PopovD_App
 {
     internal static class HeaderDrawing
     {
-        internal static readonly string[] LeftClubs = { "Salavat", "Tolpar", "Agidel", "Astra", "Azamatov" };
+        internal static readonly string[] LeftClubs = { "Azamatov", "Astra", "Agidel", "Tolpar", "Salavat" };
         internal static readonly string[] RightClubs = { "Cska", "Ska", "Spartak", "Avangard", "AkBars" };
 
         internal static void Draw(Graphics g, RectangleF? viewport = null, bool includeSticks = true)

@@ -7,8 +7,11 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer;
+        private Bitmap? buttonLayer, captionLayer, frostTexture, iceTexture;
+        private readonly FrostHoverAnimation frost;
+        private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
+        private (Size Size, string Text, int Color, bool Pressed) captionKey;
         protected override bool ShowFocusCues => false;
 
         public RinkMenuButton()
@@ -23,11 +26,17 @@ namespace LP_PopovD_App
             UseVisualStyleBackColor = false;
             Cursor = Cursors.Hand;
             AccessibleRole = AccessibleRole.PushButton;
+            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost.SetVisible(Visible);
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
+            frostTexture?.Dispose();
+            iceTexture?.Dispose();
+            frostTexture = iceTexture = null;
+            frostTextureSize = Size.Empty;
             if (Width < 2 || Height < 2)
                 return;
             using GraphicsPath shape = new();
@@ -69,6 +78,38 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;
             g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
+            float ambient = frost.Ambient * (1 - frost.Amount);
+            if (ambient > .002f || frost.Amount > .002f)
+            {
+                if (frostTexture == null || frostTextureSize != ClientSize)
+                {
+                    frostTexture?.Dispose();
+                    frostTextureSize = ClientSize;
+                    frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
+                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, true);
+                }
+                if (ambient > .002f)
+                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
+                if (frost.Amount > .002f && iceTexture != null)
+                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+            }
+            // Построение контура надписи — дорогая операция GDI+.
+            // Выполняем её при изменении текста/размера/нажатия, а
+            // промежуточные кадры инея используют готовый прозрачный спрайт.
+            var labelKey = (ClientSize, Text, ForeColor.ToArgb(), pressed);
+            if (captionLayer == null || captionKey != labelKey)
+            {
+                captionLayer?.Dispose();
+                captionLayer = new Bitmap(Width, Height,
+                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                captionLayer.SetResolution(96, 96);
+                using Graphics type = Graphics.FromImage(captionLayer);
+                type.SmoothingMode = SmoothingMode.AntiAlias;
+                type.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                DrawCaptionOnTop(type, pressed);
+                captionKey = labelKey;
+            }
+            g.DrawImageUnscaled(captionLayer, 0, 0);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -79,13 +120,18 @@ namespace LP_PopovD_App
                 using SolidBrush glow = new(Color.FromArgb(alpha, RinkDrawing.Blue));
                 g.FillEllipse(glow, 5, 5, Math.Max(1, Width - 10), Math.Max(1, Height - 10));
             }
-            Color ink = pressed ? Color.FromArgb(9, 49, 96) : ForeColor;
+        }
+
+        protected virtual void DrawCaptionOnTop(Graphics g, bool down)
+        {
+            Color ink = down ? Color.FromArgb(9, 49, 96) : ForeColor;
             RinkTypography.Draw(g, Text, new RectangleF(0, 0, Width, Height), ink);
         }
 
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
+            frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
@@ -94,6 +140,7 @@ namespace LP_PopovD_App
         {
             hovered = false;
             pressed = false;
+            frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -142,9 +189,22 @@ namespace LP_PopovD_App
             base.OnKeyUp(e);
         }
 
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            frost?.SetVisible(Visible);
+            base.OnVisibleChanged(e);
+        }
+
         protected override void Dispose(bool disposing)
         {
-            if (disposing) buttonLayer?.Dispose();
+            if (disposing)
+            {
+                frost?.Dispose();
+                frostTexture?.Dispose();
+                iceTexture?.Dispose();
+                captionLayer?.Dispose();
+                buttonLayer?.Dispose();
+            }
             base.Dispose(disposing);
         }
     }

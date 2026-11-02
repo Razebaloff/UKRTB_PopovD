@@ -19,7 +19,8 @@ namespace LP_PopovD_App
             Rectangle? revealBounds = null)
         {
             displaySize = size;
-            int width = Math.Min(size.Width, size.Width >= 2560 ? 960 : 1280);
+            // Кадры пролёта готовятся один раз, движущаяся область не превышает 960 px.
+            int width = Math.Min(size.Width, 960);
             renderSize = new Size(width, Math.Max(1, (int)Math.Round(size.Height * width / (float)size.Width)));
             originalFrom = before; originalTo = after;
             from = Reduced(before, renderSize);

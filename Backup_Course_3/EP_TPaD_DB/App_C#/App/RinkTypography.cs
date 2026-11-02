@@ -4,6 +4,7 @@ namespace LP_PopovD_App
 {
     internal static class RinkTypography
     {
+        // Исходный шрифт интерфейса: Arial.
         internal const string FamilyName = "Arial";
         private static float sharedPuckRadius;
 

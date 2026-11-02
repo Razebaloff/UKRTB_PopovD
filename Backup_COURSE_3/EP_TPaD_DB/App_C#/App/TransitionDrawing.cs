@@ -23,8 +23,8 @@ namespace LP_PopovD_App
             Rectangle destination = new(Point.Empty, size);
             if (p <= 0) { g.DrawImage(from, destination, 0, 0, from.Width, from.Height, GraphicsUnit.Pixel); return; }
             if (p >= 1) { g.DrawImage(to, destination, 0, 0, to.Width, to.Height, GraphicsUnit.Pixel); return; }
-            g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
             using ImageAttributes alpha = new();
             if (revealOnly)
             {

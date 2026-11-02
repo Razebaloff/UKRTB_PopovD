@@ -15,7 +15,8 @@ namespace LP_PopovD_App
         private PointF transitionOrigin;
         private TransitionFrameRenderer? transitionRenderer;
         private bool revealOnly, focusCodeAfterTransition, scheduleFocus, exporting;
-        private readonly Stopwatch transitionClock = new(), stickClock = Stopwatch.StartNew(), successClock = new();
+        private readonly Stopwatch transitionClock = new(), stickClock = Stopwatch.StartNew(),
+            successClock = new();
         private readonly System.Windows.Forms.Timer transitionTimer, stickTimer, successTimer;
         private readonly StickAnimationState stickAnimation = new();
         private readonly LoginFlowState loginFlow = new();
@@ -231,14 +232,9 @@ namespace LP_PopovD_App
                 if (cache != surfaces || IsDisposed || Disposing) return;
                 StickFeedbackDrawing.Prepare(ClientSize);
                 stickBackdrop?.Dispose();
-                stickBackdrop = CaptureScreen();
-                // Убираем только неподвижную пару; снимок сохраняет введённые данные и маскировку пароля.
-                Rectangle region = StickFeedbackDrawing.PixelBounds(ClientSize);
-                using (Graphics g = Graphics.FromImage(stickBackdrop))
-                {
-                    g.CompositingMode = CompositingMode.SourceCopy;
-                    g.DrawImage(sceneCache!, region, region, GraphicsUnit.Pixel);
-                }
+                // Сразу снимаем фон без неподвижных клюшек. Прямоугольное
+                // стирание поверх готового снимка создавало видимый квадрат.
+                stickBackdrop = CaptureScreen(withoutSticks: true);
                 Action action = () => { };
                 if (target.HasValue) action = () => _ = NavigateAsync(target.Value, Center(button), button == entryScheduleButton);
                 else if (button == submitButton) action = () => _ = SubmitAuthAsync();
@@ -265,7 +261,7 @@ namespace LP_PopovD_App
 
         internal void PaintScene(Graphics graphics) => PaintScene(graphics, ClientRectangle);
 
-        internal void PaintScene(Graphics graphics, Rectangle sourceBounds)
+        internal void PaintScene(Graphics graphics, Rectangle sourceBounds, bool withoutSticks = false)
         {
             GraphicsState saved = graphics.Save();
             if (sceneCache == null)
@@ -285,7 +281,11 @@ namespace LP_PopovD_App
             graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
-            if (screen != AppScreen.Menu) StickFeedbackDrawing.Draw(graphics, ClientSize);
+            // Для небольших кнопок вдали от заголовка не перерисовываем
+            // клюшки: фоновая сцена берётся из готового bitmap-кэша.
+            if (screen != AppScreen.Menu && !withoutSticks &&
+                sourceBounds.IntersectsWith(StickFeedbackDrawing.PixelBounds(ClientSize)))
+                StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
             {
                 RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
@@ -353,7 +353,7 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
-            submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД";
+            submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
             submitButton.AccessibleName = submitButton.Text;
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
@@ -383,17 +383,34 @@ namespace LP_PopovD_App
             AcceptButton = entry ? entryButton : auth ? submitButton : null;
         }
 
-        private Bitmap CaptureScreen()
+        private Bitmap CaptureScreen(bool withoutSticks = false)
         {
+            // Не вызываем DrawToBitmap для всей полноэкранной формы: это заставляло
+            // WinForms синхронно обходить и перерисовывать все дочерние HWND.
+            // Готовую сцену копируем один раз, а текст/поля снимаем небольшими плитками.
             Bitmap image = new(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
             image.SetResolution(96, 96);
-            try { DrawToBitmap(image, ClientRectangle); return image; }
-            catch (Exception error) when (error is ExternalException or ArgumentException or NotSupportedException)
+            using Graphics g = Graphics.FromImage(image);
+            PaintScene(g, ClientRectangle, withoutSticks);
+            foreach (Control control in Controls)
             {
-                using Graphics g = Graphics.FromImage(image);
-                PaintScene(g, ClientRectangle);
-                return image;
+                if (!control.Visible || control.Width < 1 || control.Height < 1 ||
+                    !ClientRectangle.IntersectsWith(control.Bounds)) continue;
+                using Bitmap tile = new(control.Width, control.Height, PixelFormat.Format32bppPArgb);
+                tile.SetResolution(96, 96);
+                try
+                {
+                    control.DrawToBitmap(tile, new Rectangle(Point.Empty, control.Size));
+                    g.DrawImageUnscaled(tile, control.Left, control.Top);
+                }
+                catch (Exception error) when (error is ExternalException or ArgumentException or NotSupportedException)
+                {
+                    // Несовместимый нативный контрол не должен прерывать переход;
+                    // его фоновая ткань уже есть в готовой сцене.
+                    Debug.WriteLine("Control snapshot unavailable: " + error.GetType().Name);
+                }
             }
+            return image;
         }
 
 
