@@ -459,7 +459,9 @@ namespace LP_PopovD_App
         // Единая геометрия воздушных потоков: верхние углы -> область
         // полей ввода -> соответствующие нижние углы. По ней рисуется
         // сама метель и вычисляется поле скорости для обломков интерфейса.
-        private static PointF WindPath(bool left, float lane, float progress)
+        // Плавная центральная ось потока без петель: по её высоте можно
+        // найти участок, к которому притягивается сорванная с поля пыль.
+        private static PointF WindBackbone(bool left, float lane, float progress)
         {
             lane = Math.Clamp(lane, 0, 1);
             float t = Math.Clamp(progress, 0, 1);
@@ -473,6 +475,24 @@ namespace LP_PopovD_App
                 ? Quadratic(start, approach, turn, 2 * t)
                 : Quadratic(turn, departure, finish, 2 * t - 1);
             return left ? sample : new PointF(1600 - sample.X, sample.Y);
+        }
+
+        // Снежный поток закручивается крупными кудрями вокруг осевой линии.
+        // Ветры обоих углов зеркальны, но слои обладают разными фазами.
+        private static PointF WindPath(bool left, float lane, float progress)
+        {
+            float t = Math.Clamp(progress, 0, 1);
+            PointF center = WindBackbone(left, lane, t);
+            PointF ahead = WindBackbone(left, lane, Math.Min(1, t + .008f));
+            PointF behind = WindBackbone(left, lane, Math.Max(0, t - .008f));
+            float dx = ahead.X - behind.X, dy = ahead.Y - behind.Y;
+            float length = MathF.Max(.001f, MathF.Sqrt(dx * dx + dy * dy));
+            float tx = dx / length, ty = dy / length;
+            float angle = t * MathF.Tau * 2.65f + lane * MathF.PI * 1.9f;
+            float envelope = MathF.Sin(MathF.PI * t);
+            float radius = (37 + lane * 39) * envelope;
+            return new PointF(center.X + radius * (-ty * MathF.Cos(angle) + tx * MathF.Sin(angle)),
+                center.Y + radius * (tx * MathF.Cos(angle) + ty * MathF.Sin(angle)));
         }
 
         private static PointF Quadratic(PointF a, PointF b, PointF c, float t)
@@ -516,7 +536,7 @@ namespace LP_PopovD_App
             for (int j = 0; j < 7; j++)
             {
                 float mid = (low + high) * .5f;
-                if (WindPath(left, lane, mid).Y < particle.Y) low = mid;
+                if (WindBackbone(left, lane, mid).Y < particle.Y) low = mid;
                 else high = mid;
             }
             float t = (low + high) * .5f;
