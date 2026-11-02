@@ -385,15 +385,32 @@ namespace LP_PopovD_App
 
         private Bitmap CaptureScreen()
         {
+            // Не вызываем DrawToBitmap для всей полноэкранной формы: это заставляло
+            // WinForms синхронно обходить и перерисовывать все дочерние HWND.
+            // Готовую сцену копируем один раз, а текст/поля снимаем небольшими плитками.
             Bitmap image = new(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
             image.SetResolution(96, 96);
-            try { DrawToBitmap(image, ClientRectangle); return image; }
-            catch (Exception error) when (error is ExternalException or ArgumentException or NotSupportedException)
+            using Graphics g = Graphics.FromImage(image);
+            PaintScene(g, ClientRectangle);
+            foreach (Control control in Controls)
             {
-                using Graphics g = Graphics.FromImage(image);
-                PaintScene(g, ClientRectangle);
-                return image;
+                if (!control.Visible || control.Width < 1 || control.Height < 1 ||
+                    !ClientRectangle.IntersectsWith(control.Bounds)) continue;
+                using Bitmap tile = new(control.Width, control.Height, PixelFormat.Format32bppPArgb);
+                tile.SetResolution(96, 96);
+                try
+                {
+                    control.DrawToBitmap(tile, new Rectangle(Point.Empty, control.Size));
+                    g.DrawImageUnscaled(tile, control.Left, control.Top);
+                }
+                catch (Exception error) when (error is ExternalException or ArgumentException or NotSupportedException)
+                {
+                    // Несовместимый нативный контрол не должен прерывать переход;
+                    // его фоновая ткань уже есть в готовой сцене.
+                    Debug.WriteLine("Control snapshot unavailable: " + error.GetType().Name);
+                }
             }
+            return image;
         }
 
 
