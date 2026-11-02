@@ -290,7 +290,9 @@ namespace LP_PopovD_App
             graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
-            LavaUnderIceDrawing.Draw(graphics, ClientSize, screen, lavaClock.Elapsed.TotalSeconds);
+            LavaUnderIceDrawing.Draw(graphics, ClientSize, screen,
+                screen == AppScreen.Login && loginFlow.CodeRequested,
+                lavaClock.Elapsed.TotalSeconds, withoutSticks);
             if (screen != AppScreen.Menu && !withoutSticks)
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
