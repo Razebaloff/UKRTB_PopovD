@@ -88,6 +88,15 @@ namespace LP_PopovD_App
             g.Restore(saved);
         }
 
+        // Прозрачная пыль гаснет у границы области клюшек: никакой
+        // прямоугольной кромки от обрезанных снежных шлейфов.
+        private static float SoftEdge(float x, float y)
+        {
+            float dx = Math.Min(x - AnimationBounds.Left, AnimationBounds.Right - x) / 16f;
+            float dy = Math.Min(y - AnimationBounds.Top, AnimationBounds.Bottom - y) / 15f;
+            return SnowDrawing.Smooth(Math.Clamp(Math.Min(dx, dy), 0, 1));
+        }
+
         // Не отдельные плавающие снежинки, а плотные движущиеся воздушные струи.
         // Дальняя пелена обтекает клюшки, ближняя проносится поверх них.
         // Clip установлен в Draw и защищает флаги по обе стороны.
@@ -104,14 +113,14 @@ namespace LP_PopovD_App
             {
                 float side = (i & 1) == 0 ? -1 : 1;
                 float phase = p * 9.5f + i * 1.127f;
-                float y = -5 + i * (135f / streams) + 7 * MathF.Sin(phase);
-                float sourceX = Center.X + side * (66 + 6 * MathF.Sin(phase * .8f));
-                float endX = Center.X - side * (65 + 7 * MathF.Cos(phase));
-                float bend = 20 * MathF.Sin(phase * 1.3f);
+                float y = 16 + i * (79f / streams) + 4 * MathF.Sin(phase);
+                float sourceX = Center.X + side * (38 + 4 * MathF.Sin(phase * .8f));
+                float endX = Center.X - side * (36 + 4 * MathF.Cos(phase));
+                float bend = 7 * MathF.Sin(phase * 1.3f);
                 PointF from = new(sourceX, y);
-                PointF c1 = new(Center.X + side * 23, y - 20 + bend);
-                PointF c2 = new(Center.X - side * 28, y + 27 + bend);
-                PointF to = new(endX, y + 8 * MathF.Sin(phase + 1.9f));
+                PointF c1 = new(Center.X + side * 18, y - 12 + bend);
+                PointF c2 = new(Center.X - side * 19, y + 14 + bend);
+                PointF to = new(endX, y + 5 * MathF.Sin(phase + 1.9f));
                 using GraphicsPath ribbon = new();
                 ribbon.AddBezier(from, c1, c2, to);
 
@@ -134,11 +143,12 @@ namespace LP_PopovD_App
             {
                 SnowSeed seed = snow[(i * 7 + (foreground ? 43 : 11)) % snow.Length];
                 float spin = seed.Angle + p * (6 + seed.Speed * 4);
-                float radius = 13 + seed.X * 42 + 3 * MathF.Sin(p * 11 + i);
+                float radius = 12 + seed.X * 26 + 2 * MathF.Sin(p * 11 + i);
                 float x = Center.X + MathF.Cos(spin) * radius;
                 float y = Center.Y + MathF.Sin(spin) * radius * 1.12f;
-                float size = 7 + seed.Y * (foreground ? 10 : 19);
-                cloud.Color = Color.FromArgb((int)((foreground ? 8 : 11) * wind), 232, 248, 255);
+                float size = 6 + seed.Y * (foreground ? 7 : 10);
+                float feather = SoftEdge(x, y);
+                cloud.Color = Color.FromArgb((int)((foreground ? 8 : 11) * wind * feather), 232, 248, 255);
                 g.FillEllipse(cloud, x - size, y - size * .30f, size * 2, size * .70f);
             }
 
@@ -157,7 +167,8 @@ namespace LP_PopovD_App
                 float y = Center.Y + MathF.Sin(spiral) * radius * 1.08f + 8 * (age - .5f);
                 float vx = -MathF.Sin(spiral) * (2 + 3 * seed.Speed);
                 float vy = MathF.Cos(spiral) * (1.7f + 2.3f * seed.Speed);
-                float opacity = wind * MathF.Sin(age * MathF.PI) * (.47f + seed.Y * .5f);
+                float opacity = wind * SoftEdge(x, y) *
+                    MathF.Sin(age * MathF.PI) * (.47f + seed.Y * .5f);
                 SnowDrawing.Grain(g, grains, trace, x, y,
                     seed.Radius * (foreground ? .94f : .80f), vx, vy, opacity, false);
 
