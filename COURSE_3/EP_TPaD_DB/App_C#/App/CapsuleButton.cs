@@ -10,7 +10,7 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
-        private Bitmap? frostTexture;
+        private Bitmap? frostTexture, iceTexture;
         private Size frostTextureSize;
         [DefaultValue(false)]
         internal bool Primary { get; set; }
@@ -42,7 +42,8 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostTexture?.Dispose();
-            frostTexture = null;
+            iceTexture?.Dispose();
+            frostTexture = iceTexture = null;
             frostTextureSize = Size.Empty;
         }
 
@@ -83,11 +84,12 @@ namespace LP_PopovD_App
                     frostTexture?.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
+                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, false);
                 }
                 if (ambient > .002f)
-                    FrostDrawing.Draw(g, frostTexture, ClientRectangle, ambient, false);
-                if (frost.Amount > .002f)
-                    FrostDrawing.DrawIceShell(g, frostTexture, ClientRectangle, frost.Amount, false);
+                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
+                if (frost.Amount > .002f && iceTexture != null)
+                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
             // Длинная надпись должна полностью помещаться в овальную кнопку.
             float measured = g.MeasureString(Text, Font, new PointF(0, 0), center).Width;
@@ -112,6 +114,7 @@ namespace LP_PopovD_App
             {
                 frost?.Dispose();
                 frostTexture?.Dispose();
+                iceTexture?.Dispose();
                 labelFont?.Dispose();
             }
             base.Dispose(disposing);
