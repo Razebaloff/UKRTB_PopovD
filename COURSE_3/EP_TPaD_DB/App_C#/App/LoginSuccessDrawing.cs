@@ -91,7 +91,7 @@ namespace LP_PopovD_App
                     Rectangle tile = new(left, top, right - left, bottom - top);
                     if (tile.Width < 1 || tile.Height < 1) continue;
                     Bitmap image = reducedBefore.Clone(tile, PixelFormat.Format32bppPArgb);
-                    uint hash = (uint)(col * 2246822519u + row * 3266489917u + bounds.Left * 668265263u);
+                    uint hash = unchecked((uint)col * 2246822519u + (uint)row * 3266489917u + (uint)bounds.Left * 668265263u);
                     float jitter = (hash & 255) / 255f;
                     float delay = .10f + .20f * jitter + .07f * row;
                     pieces.Add((image, tile, delay, .62f + jitter * .75f, (hash >> 8 & 255) / 255f));
