@@ -92,7 +92,7 @@ namespace LP_PopovD_App
             Random random = new(seed);
             float cx = size.Width * .5f, cy = size.Height * .5f;
             float radius = Math.Min(size.Width, size.Height) * .5f - 2;
-            int count = Math.Clamp((int)(size.Width * size.Height / 195f), 110, 500);
+            int count = Math.Clamp((int)(size.Width * size.Height / 145f), 170, 850);
             using Pen crystal = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             using Pen twig = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
             using SolidBrush sparkle = new(Color.White);
@@ -102,12 +102,17 @@ namespace LP_PopovD_App
                 float x, y, ux, uy, depth;
                 if (round)
                 {
-                    float a = (float)(random.NextDouble() * MathF.Tau);
-                    float edge = .94f + .06f * random.NextSingle();
-                    x = cx + MathF.Cos(a) * radius * edge;
-                    y = cy + MathF.Sin(a) * radius * edge;
-                    ux = -MathF.Cos(a); uy = -MathF.Sin(a);
-                    depth = radius * (.05f + random.NextSingle() * .35f);
+                    // Кристаллы рождаются также в середине шайбы, не только по ободу.
+                    float a = random.NextSingle() * MathF.Tau;
+                    float fraction = i % 3 == 0
+                        ? .73f + random.NextSingle() * .26f
+                        : MathF.Sqrt(random.NextSingle()) * .94f;
+                    x = cx + MathF.Cos(a) * radius * fraction;
+                    y = cy + MathF.Sin(a) * radius * fraction;
+                    float direction = a + MathF.PI + (random.NextSingle() - .5f) * 2.9f;
+                    ux = MathF.Cos(direction);
+                    uy = MathF.Sin(direction);
+                    depth = radius * (.035f + random.NextSingle() * .14f);
                 }
                 else
                 {
@@ -129,7 +134,15 @@ namespace LP_PopovD_App
                         ux = left ? MathF.Cos(a) : -MathF.Cos(a);
                         uy = -MathF.Sin(a);
                     }
-                    depth = size.Height * (.08f + random.NextSingle() * .36f);
+                    // Часть инея появляется на самой ткани кнопки, а не по одному контуру.
+                    if (i % 3 != 0)
+                    {
+                        x = size.Width * (.07f + random.NextSingle() * .86f);
+                        y = size.Height * (.12f + random.NextSingle() * .76f);
+                        float angle = random.NextSingle() * MathF.Tau;
+                        ux = MathF.Cos(angle); uy = MathF.Sin(angle);
+                    }
+                    depth = size.Height * (.04f + random.NextSingle() * .18f);
                 }
 
                 float x2 = x + ux * depth, y2 = y + uy * depth;
@@ -162,24 +175,67 @@ namespace LP_PopovD_App
         internal static void Draw(Graphics g, Bitmap texture, Rectangle bounds, float amount, bool round)
         {
             if (amount <= .002f || bounds.Width < 5 || bounds.Height < 5) return;
-            float p = SnowDrawing.Smooth(amount);
-            float inset = round ? Math.Min(bounds.Width, bounds.Height) * .30f * p
-                                : bounds.Height * .40f * p;
+            float p = SnowDrawing.Smooth(Math.Clamp(amount, 0, 1));
             GraphicsState saved = g.Save();
-            using GraphicsPath band = new() { FillMode = FillMode.Alternate };
             RectangleF outer = new(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2);
-            using (GraphicsPath border = Shape(outer, round)) band.AddPath(border, false);
-            RectangleF inside = RectangleF.Inflate(outer, -Math.Max(.5f, inset), -Math.Max(.5f, inset));
-            if (inside.Width > 4 && inside.Height > 4)
-            {
-                using GraphicsPath hole = Shape(inside, round);
-                band.AddPath(hole, false);
-            }
-            g.SetClip(band, CombineMode.Intersect);
-            using ImageAttributes attributes = new();
-            attributes.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(.35f + p * .65f, 0, 1) });
+            using GraphicsPath silhouette = Shape(outer, round);
+            g.SetClip(silhouette, CombineMode.Intersect);
+            using SolidBrush frostMist = new(Color.FromArgb((int)(19 * p), 217, 241, 254));
+            g.FillPath(frostMist, silhouette);
+            using ImageAttributes alpha = new();
+            alpha.SetColorMatrix(new ColorMatrix { Matrix33 = .18f + .77f * p });
             g.InterpolationMode = InterpolationMode.Bilinear;
-            g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height, GraphicsUnit.Pixel, attributes);
+
+            void Paint()
+            {
+                g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height,
+                    GraphicsUnit.Pixel, alpha);
+            }
+
+            if (p >= .995f)
+            {
+                Paint(); // После завершения прогресса покрыта ВСЯ поверхность.
+            }
+            else
+            {
+                float radius = Math.Min(outer.Width, outer.Height) * .5f;
+                float inset = Math.Max(.1f, radius * p);
+                using GraphicsPath outerBand = new() { FillMode = FillMode.Alternate };
+                outerBand.AddPath(silhouette, false);
+                RectangleF center = RectangleF.Inflate(outer, -inset, -inset);
+                if (center.Width > 1 && center.Height > 1)
+                {
+                    using GraphicsPath inner = Shape(center, round);
+                    outerBand.AddPath(inner, false);
+                }
+                GraphicsState bandState = g.Save();
+                g.SetClip(outerBand, CombineMode.Intersect);
+                Paint();
+                g.Restore(bandState);
+
+                // Отдельные очаги кристаллизации, которые растут не синхронно.
+                // Их форма и координаты повторяемы, но хаотично распределены.
+                using GraphicsPath islands = new(FillMode.Winding);
+                Random random = new(unchecked(bounds.Width * 7927 + bounds.Height * 1013 + (round ? 1987 : 1297)));
+                for (int i = 0; i < 46; i++)
+                {
+                    float threshold = random.NextSingle() * .75f;
+                    float growth = Math.Clamp((p - threshold) / (.9f - threshold), 0, 1);
+                    float span = (3 + random.NextSingle() * (round ? 27 : 15)) * growth;
+                    float x = outer.Left + random.NextSingle() * outer.Width;
+                    float y = outer.Top + random.NextSingle() * outer.Height;
+                    if (span > .1f)
+                        islands.AddEllipse(x - span, y - span * (.5f + random.NextSingle() * .45f),
+                            span * 2, span * (1.1f + random.NextSingle() * .9f));
+                }
+                if (islands.PointCount > 0)
+                {
+                    GraphicsState islandState = g.Save();
+                    g.SetClip(islands, CombineMode.Intersect);
+                    Paint();
+                    g.Restore(islandState);
+                }
+            }
             g.Restore(saved);
         }
     }
