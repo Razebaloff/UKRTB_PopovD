@@ -2,70 +2,199 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#081a2b">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,viewport-fit=cover">
+<meta name="theme-color" content="#93bfd7">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Территория хоккея — мобильная версия</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Территория хоккея</title>
 <style>
-:root{color-scheme:dark;--text:#f0f8ff;--muted:#b6cddd;--blue:#82dcff;--ink:#061727;--glass:rgba(9,34,55,.85)}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overscroll-behavior:none}body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--ink);color:var(--text)}
-button,input{font:inherit}button{touch-action:manipulation;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #77dcff;outline-offset:2px}button:disabled{opacity:.5;cursor:default}
-#app{position:relative;height:100vh;height:100dvh;min-height:480px;overflow:hidden;isolation:isolate;background:radial-gradient(ellipse at 45% 30%,#3c8ab0 0%,#153c60 55%,#051525 100%)}
-.arena{position:absolute;inset:0;z-index:-2;opacity:.8;overflow:hidden;pointer-events:none}.arena svg{width:100%;height:100%;object-fit:cover}.ice-film{position:absolute;inset:0;background:linear-gradient(135deg,rgba(9,27,46,.64),rgba(6,16,32,.24) 50%,rgba(3,14,28,.8)),radial-gradient(circle at 50% 50%,transparent 12%,rgba(0,12,25,.65) 84%);pointer-events:none}
-.snow{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:-1}.snow i{position:absolute;display:block;top:-15vh;left:var(--x);width:var(--r);height:var(--r);border-radius:50%;background:rgba(231,250,255,.7);box-shadow:0 0 4px #ccecff;animation:fall var(--d) linear infinite;animation-delay:var(--delay);will-change:transform}@keyframes fall{to{transform:translate3d(var(--wind),120vh,0)}}
-.shell{width:min(100%,580px);height:100%;margin:auto;display:flex;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));gap:12px}
-.brand{padding:8px 4px 5px;text-align:center;flex:0 0 auto;text-shadow:0 4px 18px #081624}.brand .tag{color:#c8e8f6;font-size:.7rem;letter-spacing:.23em;text-transform:uppercase;font-weight:800}.brand h1{font-size:clamp(1.3rem,5.5vw,2rem);line-height:1.06;letter-spacing:.06em;margin:6px 0 2px;font-weight:900}.brand .accent{color:#86d5ff}.teams{display:flex;justify-content:center;gap:5px;flex-wrap:wrap;opacity:.85;margin-top:5px}.teams span{font-size:10px;padding:3px 6px;border:1px solid rgba(227,247,255,.24);border-radius:50px;background:rgba(13,40,65,.5)}
-.screen{display:none;flex-direction:column;flex:1;min-height:0;gap:12px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#7198ad transparent;padding:6px 2px 12px;animation:appear .3s ease both}.screen.active{display:flex}@keyframes appear{from{opacity:0;transform:translate3d(0,9px,0)}to{opacity:1;transform:translateZ(0)}}
-.hero{display:grid;place-items:center;flex:1;min-height:180px}.center-puck{height:min(27vh,178px);aspect-ratio:1;border:10px solid #10202b;border-radius:50%;display:grid;place-items:center;text-align:center;background:radial-gradient(circle at 38% 28%,#313940,#080f16 78%);box-shadow:inset 0 0 0 2px #6b7f8c,0 18px 46px #061325bb;position:relative}.center-puck::before{content:"";position:absolute;inset:10%;border:1px dashed #7e9dac66;border-radius:50%}.center-puck span{font-weight:900;letter-spacing:.06em;font-size:clamp(.95rem,4vw,1.3rem);line-height:1.2;z-index:1}
-.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;margin:auto 0 0}.actions .wide{grid-column:1/-1}.ice-btn{position:relative;isolation:isolate;overflow:hidden;min-height:62px;border:1px solid rgba(196,237,255,.5);border-radius:18px;color:var(--text);background:linear-gradient(135deg,#1e5174ed,#0b2848f5);box-shadow:inset 0 1px rgba(255,255,255,.18),0 7px 18px #03132180;font-weight:800;font-size:clamp(.73rem,2.8vw,.98rem);letter-spacing:.035em;padding:11px 13px;transition:transform .13s ease,background .2s ease}.ice-btn:active{transform:scale(.97)}.ice-btn::before{content:"";position:absolute;inset:0;z-index:-1;opacity:0;background:repeating-linear-gradient(120deg,transparent 0 13px,#e2f9ff20 14px 15px,transparent 17px 34px),radial-gradient(ellipse at 20% 15%,#ddfaff75,transparent 50%);animation:frost 5.8s ease-in-out infinite;pointer-events:none}@keyframes frost{0%,100%{opacity:0}35%,65%{opacity:.8}}.ice-btn:hover,.ice-btn:focus-visible{background:linear-gradient(135deg,#497f9b,#174565)}.ice-btn:hover::before,.ice-btn:focus-visible::before{animation:none;opacity:1}.ice-btn.secondary{background:linear-gradient(135deg,#244459ef,#112638f2)}
-.panel{background:var(--glass);border:1px solid rgba(188,231,253,.35);border-radius:24px;box-shadow:0 16px 50px #001020aa,inset 0 1px #d4f4ff19;padding:clamp(16px,5vw,28px);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}.panel h2{font-size:1.3rem;letter-spacing:.07em;margin:0 0 8px}.panel p{font-size:.89rem;line-height:1.5;color:var(--muted);margin:0 0 15px}.stack{display:flex;flex-direction:column;gap:11px}.field{display:flex;flex-direction:column;gap:5px}.field[hidden]{display:none}.field span{font-size:.8rem;color:#c1e6f8;font-weight:700}.field input{width:100%;background:#eff9fd;color:#09283b;border:2px solid transparent;border-radius:13px;min-height:51px;padding:12px 14px;font-size:16px;outline:none}.field input:focus{border-color:#62cfff}.check{display:flex;align-items:center;gap:10px;font-size:.84rem;color:#d5f1ff;margin:4px 0}.check input{width:21px;height:21px;accent-color:#3693c8}.notice{color:#b2d1e1;font-size:.79rem;line-height:1.5}.status{min-height:17px;color:#ffd7aa;font-size:.82rem;font-weight:600}.bottom{margin-top:auto;padding-top:6px}.back{align-self:flex-start;background:#0b2b47ca;color:#eff9ff;border:1px solid #a7c9db6d;border-radius:999px;min-height:44px;padding:8px 18px;font-weight:700}
-.group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tile{min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}.tile b{font-size:1.08rem}.tile small{color:#beddef;font-size:.76rem}.tile svg{width:30px;height:30px;stroke:#a4e9ff;fill:none;stroke-width:1.8}
-.jersey{display:flex;align-items:center;justify-content:center;position:relative;min-height:160px;margin:8px 0}.jersey svg{width:min(66%,245px);max-height:190px;filter:drop-shadow(0 15px 20px #00152bba)}.jersey-name{position:absolute;top:35%;font-weight:950;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(12px,4.2vw,22px);color:#f7fcff;letter-spacing:.07em;text-shadow:0 0 11px #cdeaff}.jersey-name.land{animation:imprint 1.25s cubic-bezier(.25,.8,.2,1) both}@keyframes imprint{0%{opacity:0;transform:translate3d(0,-54px,0) scale(.43);text-shadow:0 0 23px white}45%{opacity:1;transform:translate3d(0,-25px,0) scale(1.08)}75%{transform:translate3d(0,3px,0) scale(1.06,.88)}100%{transform:translateZ(0) scale(1);text-shadow:0 0 4px #cdeaff}}
-.mini-rink{border:1px solid #b4e9ff70;border-radius:12px;padding:10px;background:#9abec51b;min-height:120px;display:grid;place-items:center}.pill{padding:8px 12px;display:inline-flex;background:#153d60;border-radius:60px;font-size:.8rem;color:#bfedff}.foot{flex:0 0 auto;text-align:center;font-size:.68rem;color:#aad2e6bb;padding:2px 0 4px}.muted{color:#b3d1e0}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-@media(max-height:660px){.shell{gap:5px}.brand{padding:3px}.brand h1{margin:2px}.panel{padding:14px}.hero{min-height:100px}.center-puck{height:100px}.ice-btn{min-height:50px}.actions{gap:8px}.teams{display:none}.screen{gap:7px}}
-@media(orientation:landscape) and (max-height:550px){.shell{max-width:820px}.brand{position:absolute;top:5px;left:12px;text-align:left;z-index:1}.brand h1{font-size:1rem}.teams{display:none}.screen.active{margin-top:45px}.hero{display:none}.actions{grid-template-columns:repeat(3,minmax(0,1fr));margin:auto}.actions .wide{grid-column:auto}.panel{max-width:720px;width:100%;margin:auto}.group{grid-template-columns:repeat(4,1fr)}.tile{min-height:90px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:0ms!important}.snow{display:none}}
+:root{font-family:Arial,Helvetica,sans-serif;color:#174d80;background:#95bfd5;--ice:#e4f5ff;--ink:#194e7a}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+body{background:#95bfd5}
+button,input{font:inherit}
+button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible{outline:4px solid #ffffff;outline-offset:3px}
+#app{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;background:linear-gradient(150deg,#beddec,#74a7c6 50%,#b6d9e9)}
+#pan{width:100%;height:100%;display:flex;align-items:center;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;scroll-behavior:smooth}
+#pan::-webkit-scrollbar{display:none}
+#box{position:relative;flex:none;margin:auto;overflow:hidden;box-shadow:0 0 0 1px #3b6b8740}
+#stage{width:1920px;height:1080px;position:absolute;top:0;left:0;transform-origin:top left;overflow:hidden;isolation:isolate}
+#artwork{position:absolute;inset:0;display:block;width:1920px;height:1080px;pointer-events:none;user-select:none;-webkit-user-drag:none}
+#fallback{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,#d2e9f2,#7eb3d2);z-index:-1}
+#fallback:before{content:'ТЕРРИТОРИЯ ХОККЕЯ';position:absolute;top:260px;left:0;width:100%;text-align:center;font-size:52px;font-weight:800;letter-spacing:2px;color:#194e7a}
+.hotspot{position:absolute;display:grid;place-items:center;padding:0;appearance:none;background:transparent;border:0;color:transparent;outline-offset:5px;z-index:3}
+.hotspot.round{border-radius:50%}.hotspot.pill{border-radius:999px}
+/* Десктопная фактура и надписи принадлежат оригинальному изображению.
+   Анимируем лишь узкий ледяной обод, не перекрывающий текст. */
+.hotspot.round::after,.hotspot.pill::after{content:'';position:absolute;inset:3px;pointer-events:none;opacity:0;border-radius:inherit;border:5px solid #e8fbff;box-shadow:inset 0 0 13px 2px #e4faff85,0 0 15px #c1edff70;animation:synced-frost 6.6s ease-in-out infinite}
+.hotspot:hover::after,.hotspot:focus-visible::after,.hotspot:active::after{opacity:.96!important;animation:none;border-width:8px;box-shadow:inset 0 0 32px 5px #e3f9ff9c,0 0 24px #e2f9ff}
+.hotspot:active{transform:scale(.985)}
+@keyframes synced-frost{0%,100%{opacity:0}32%,49%{opacity:.75}80%{opacity:0}}
+.controls[hidden],#successFX[hidden]{display:none!important}
+.controls{position:absolute;inset:0;pointer-events:none;z-index:5}
+.controls>*{pointer-events:auto}
+.controls .hotspot{z-index:4}
+.input{position:absolute;background:transparent;color:#17456a;border:0;border-radius:999px;padding:2px 22px;outline:none;font-size:25px;font-weight:600;text-align:center;line-height:1;min-width:0;caret-color:#1a5e90}
+.input::placeholder{color:transparent}
+.input:focus,.input:not(:placeholder-shown){background:#f1f7fa;color:#17456a;box-shadow:inset 0 0 5px #acc8d7}
+.input:focus-visible{outline:3px solid #d7f1ff;outline-offset:-3px}
+.remember{position:absolute;display:flex;align-items:center;justify-content:flex-start;cursor:pointer}
+.remember input{position:absolute;opacity:0;inset:0;cursor:pointer;width:100%;height:100%}
+.remember .mark{display:block;position:absolute;left:20px;top:50%;transform:translateY(-50%);font-size:27px;color:#176396;opacity:0}
+.remember:has(input:checked) .mark{opacity:1}
+#stageStatus{position:absolute;left:660px;top:734px;width:600px;text-align:center;font-size:19px;font-weight:700;color:#fbdaaf;text-shadow:0 1px 5px #182e50}
+#stageStatus:empty{display:none}
+#successFX{pointer-events:none;position:absolute;inset:0;z-index:10}
+#successName{position:absolute;left:540px;top:550px;width:840px;text-align:center;font-size:54px;font-weight:900;letter-spacing:1.4px;color:white;text-shadow:0 0 8px white,0 0 34px #f8ffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;animation:imprint 2.35s ease-in-out both}
+@keyframes imprint{0%{opacity:0;transform:translate3d(0,-135px,0) scale(.45)}20%{opacity:1;transform:translate3d(0,-130px,0) scale(.6)}48%{transform:translate3d(0,-110px,0) scale(1.14)}74%{transform:translate3d(0,-15px,0) scale(1.13)}82%{transform:translate3d(0,12px,0) scale(1.08,.89)}100%{opacity:1;transform:translateZ(0) scale(1);text-shadow:0 0 3px #f4ffff}}
+#snowFX{position:absolute;inset:0;z-index:8;overflow:hidden;pointer-events:none}
+#snowFX i{position:absolute;left:var(--x);top:var(--y);width:var(--r);height:var(--r);background:#f4fcff;border-radius:50%;box-shadow:0 0 5px #f0faff;opacity:var(--o);animation:gust var(--d) cubic-bezier(.24,.43,.73,.94) both;animation-delay:var(--delay)}
+@keyframes gust{to{transform:translate3d(var(--vx),var(--vy),0);opacity:0}}
+#assist{position:absolute;z-index:30;left:0;right:0;bottom:max(12px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:9px;pointer-events:none}
+#assist button,#assist .hint{pointer-events:auto;border:1px solid #d9f2ffce;border-radius:999px;min-height:43px;padding:8px 13px;background:#123e64da;color:#f1faff;font-size:13px;font-weight:700;box-shadow:0 3px 16px #1d416d70;backdrop-filter:blur(6px)}
+#assist button:active{background:#226c9c}
+#assist .hint{display:flex;align-items:center;pointer-events:none;min-width:0}
+#rotate{display:none}
+#alert{position:absolute;z-index:35;top:max(15px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(88%,520px);min-height:48px;border-radius:16px;background:#113d60f2;color:white;padding:12px 18px;text-align:center;font-size:14px;font-weight:700;box-shadow:0 8px 22px #14304599;pointer-events:none}
+#alert[hidden]{display:none}
+#sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(orientation:landscape){#assist{bottom:max(7px,env(safe-area-inset-bottom))}#assist .hint{display:none}#assist button{min-height:34px;padding:4px 10px;opacity:.75}}
+@media(orientation:portrait){#rotate{display:inline-flex}#assist .hint{font-size:11px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}#snowFX{display:none}}
 </style>
 </head>
 <body>
 <div id="app">
-<div class="arena" aria-hidden="true"><svg viewBox="0 0 1600 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ice" x2="1" y2="1"><stop stop-color="#deeff6"/><stop offset=".5" stop-color="#a3c9df"/><stop offset="1" stop-color="#d8e8f2"/></linearGradient><pattern id="skates" width="155" height="145" patternUnits="userSpaceOnUse" patternTransform="rotate(-21)"><path d="M7 20l58 -4M66 61l42 3M18 94l83 2" fill="none" stroke="#3e7592" stroke-opacity=".14" stroke-width="1.7"/></pattern></defs><rect width="1600" height="800" fill="#426b89"/><rect x="28" y="26" width="1544" height="748" rx="120" fill="url(#ice)" stroke="#f5fcff" stroke-width="10"/><rect x="28" y="26" width="1544" height="748" rx="120" fill="url(#skates)"/><path d="M600 28V772M1000 28V772" stroke="#247eae" stroke-width="12"/><path d="M800 28V270M800 530V772M150 28V772M1450 28V772" stroke="#ba2744" stroke-width="8"/><g fill="none" stroke="#c54662" stroke-width="5"><circle cx="800" cy="400" r="120"/><circle cx="350" cy="230" r="120"/><circle cx="350" cy="570" r="120"/><circle cx="1250" cy="230" r="120"/><circle cx="1250" cy="570" r="120"/></g><path d="M150 308L28 268M150 492L28 532M1450 308l122 -40M1450 492l122 40" fill="none" stroke="#b34b5f" stroke-width="5"/><rect x="132" y="340" width="18" height="120" rx="5" fill="#b23c4a"/><rect x="1450" y="340" width="18" height="120" rx="5" fill="#b23c4a"/><g stroke="#2878ab" stroke-width="3" fill="#72add780"><path d="M150 352a48 48 0 0 1 0 96"/><path d="M1450 352a48 48 0 0 0 0 96"/></g><rect x="30" y="30" width="1540" height="740" rx="118" fill="none" stroke="#eaf9ff" stroke-opacity=".5" stroke-width="8"/></svg><div class="ice-film"></div></div>
-<div class="snow" id="snow" aria-hidden="true"></div>
-<div class="shell">
-<header class="brand"><div class="tag">Мобильная хоккейная арена</div><h1>ТЕРРИТОРИЯ <span class="accent">ХОККЕЯ</span></h1><div class="teams"><span>Салават Юлаев</span><span>Толпар</span><span>Агидель</span><span>Астра</span></div></header>
-<main id="home" class="screen active" aria-label="Главный экран"><div class="hero"><div class="center-puck"><span>ТЕРРИТОРИЯ<br>ХОККЕЯ</span></div></div><div class="actions"><button class="ice-btn" data-go="login">ВОЙТИ</button><button class="ice-btn" data-go="register">РЕГИСТРАЦИЯ</button><button class="ice-btn wide secondary" data-go="schedule">РАСПИСАНИЕ ЗАНЯТИЙ</button></div></main>
-<section id="login" class="screen" aria-label="Вход"><button class="back" data-go="home">← НАЗАД</button><div class="panel"><h2>ВХОД</h2><p>Демонстрационный вход без подключения к серверу и отправки писем.</p><form class="stack" id="loginForm"><label class="field"><span>ЛОГИН</span><input name="login" autocomplete="username" maxlength="64" required placeholder="Введите логин"></label><label class="field"><span>ПАРОЛЬ</span><input type="password" autocomplete="current-password" name="password" maxlength="128" required placeholder="Введите пароль"></label><label class="field" id="codeField" hidden><span>КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ</span><input name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="Любой непустой код в демоверсии"></label><label class="check"><input type="checkbox" name="remember">ЗАПОМНИТЬ МЕНЯ</label><div role="status" class="status" id="authStatus"></div><button class="ice-btn" type="submit" id="loginSubmit">ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ</button><div class="notice">Письма не отправляются. Это локальная мобильная демонстрация интерфейса.</div></form></div><div class="bottom"></div></section>
-<section id="register" class="screen" aria-label="Регистрация"><button class="back" data-go="home">← НАЗАД</button><div class="panel"><h2>РЕГИСТРАЦИЯ</h2><p>Форма демонстрационная. Данные никуда не отправляются.</p><form class="stack" id="registerForm"><label class="field"><span>ЛОГИН</span><input name="reglogin" required maxlength="64" autocomplete="username"></label><label class="field"><span>ПАРОЛЬ</span><input name="regpassword" required type="password" minlength="6" autocomplete="new-password"></label><label class="field"><span>ЭЛЕКТРОННАЯ ПОЧТА</span><input name="email" required type="email" autocomplete="email"></label><div role="status" class="status" id="registerStatus"></div><button type="submit" class="ice-btn">ЗАРЕГИСТРИРОВАТЬСЯ</button></form></div><div class="bottom"></div></section>
-<section id="success" class="screen" aria-label="Анимация входа"><div class="panel"><h2>ДОБРО ПОЖАЛОВАТЬ</h2><p>Имя появляется на хоккейной майке.</p><div class="jersey"><svg viewBox="0 0 300 220" aria-hidden="true"><path d="M92 23L118 9H182L208 23L271 48L294 105L238 128L223 107V210H77V107L62 128L6 105L29 48Z" fill="#d8e9f2" stroke="#8fb8d1" stroke-width="5"/><path d="M118 9Q150 47 182 9" fill="#102f4f" stroke="#d2f7ff" stroke-width="7"/><path d="M78 163H223M79 177H222" stroke="#2b83ad" stroke-width="11"/><path d="M80 192H222" stroke="#0f466f" stroke-width="6"/><path d="M23 71L66 89M277 71L234 89" stroke="#217ba4" stroke-width="14"/></svg><span class="jersey-name" id="jerseyName"></span></div><div class="notice">После анимации откроется меню.</div></div></section>
-<section id="menu" class="screen" aria-label="Меню"><button class="back" data-go="home">← НА ГЛАВНУЮ</button><div class="panel"><h2>МЕНЮ</h2><p id="greeting">Выберите раздел.</p><div class="group"><button class="ice-btn tile" data-go="rent"><b>АРЕНДА</b><small>Заказать аренду</small></button><button class="ice-btn tile" data-go="profile"><b>ПРОФИЛЬ</b><small>Данные пользователя</small></button><button class="ice-btn tile" data-go="info"><b>ИНФОРМАЦИЯ</b><small>О приложении</small></button><button class="ice-btn tile" data-go="schedule"><b>РАСПИСАНИЕ</b><small>Занятия</small></button></div></div></section>
-<section id="schedule" class="screen" aria-label="Расписание занятий"><button class="back" data-back>← НАЗАД</button><div class="panel"><h2>РАСПИСАНИЕ ЗАНЯТИЙ</h2><p>Раздел готов для подключения реального расписания. Сейчас сведения о занятиях не загружены.</p><div class="mini-rink"><span class="pill">Расписание пока не опубликовано</span></div></div></section>
-<section id="rent" class="screen" aria-label="Аренда"><button class="back" data-back>← НАЗАД</button><div class="panel"><h2>ЗАКАЗАТЬ АРЕНДУ</h2><p>Подключение бронирования арены планируется в следующем этапе. Реальные заявки не принимаются.</p></div></section>
-<section id="profile" class="screen" aria-label="Профиль"><button class="back" data-back>← НАЗАД</button><div class="panel"><h2>ПРОФИЛЬ</h2><p id="profileName">Демонстрационная версия без серверной учётной записи.</p><button class="ice-btn secondary" id="logout">ВЫЙТИ</button></div></section>
-<section id="info" class="screen" aria-label="Информация"><button class="back" data-back>← НАЗАД</button><div class="panel"><h2>ИНФОРМАЦИЯ</h2><p>«Территория хоккея» — автономная мобильная адаптация интерфейса настольного C# WinForms-приложения. Работает на Android и iPhone в современном браузере, без установки и сервера.</p><p>В этой версии доступны навигация, адаптивные элементы, демонстрационные формы, снежные и ледяные анимации. Подключение реального сервера, почты и бронирования не реализовано.</p></div></section>
-</main>
-<footer class="foot">МОБИЛЬНАЯ ДЕМО-ВЕРСИЯ · ОФЛАЙН · БЕЗ СБОРА ДАННЫХ</footer>
-</div>
+ <div id="pan" aria-label="Хоккейная арена. Проведите пальцем влево или вправо для просмотра всей сцены.">
+  <div id="box">
+   <div id="stage">
+    <div id="fallback"></div>
+    <img id="artwork" alt="" draggable="false">
+    <div id="snowFX" aria-hidden="true"></div>
+    <section id="entry" class="controls" aria-label="Главный экран">
+     <button class="hotspot round" style="left:360px;top:310px;width:346px;height:348px" data-go="login" aria-label="Войти"></button>
+     <button class="hotspot round" style="left:1214px;top:311px;width:346px;height:348px" data-go="register" aria-label="Зарегистрироваться"></button>
+     <button class="hotspot round" style="left:786px;top:585px;width:347px;height:348px" data-go="menu-schedule" aria-label="Расписание"></button>
+    </section>
+    <section id="menu" class="controls" aria-label="Главное меню" hidden>
+     <button class="hotspot pill" style="left:160px;top:315px;width:187px;height:59px" data-go="entry" aria-label="Назад"></button>
+     <button class="hotspot round" style="left:352px;top:228px;width:255px;height:257px" data-action="rent" aria-label="Заказать аренду"></button>
+     <button class="hotspot round" style="left:352px;top:592px;width:255px;height:257px" data-action="profile" aria-label="Профиль"></button>
+     <button class="hotspot round" style="left:1314px;top:228px;width:255px;height:257px" data-action="info" aria-label="Информация"></button>
+     <button class="hotspot round" style="left:1314px;top:592px;width:255px;height:257px" data-action="schedule" aria-label="Расписание занятий"></button>
+    </section>
+    <section id="login" class="controls" aria-label="Вход" hidden>
+     <button class="hotspot pill" style="left:160px;top:316px;width:187px;height:59px" data-go="entry" aria-label="Назад"></button>
+     <form id="loginForm" autocomplete="on" novalidate>
+      <input class="input" style="left:705px;top:466px;width:512px;height:66px" name="login" aria-label="Логин" placeholder=" " maxlength="64" autocomplete="username" required>
+      <input class="input" style="left:705px;top:560px;width:512px;height:66px" name="password" type="password" aria-label="Пароль" placeholder=" " maxlength="128" autocomplete="current-password" required>
+      <input class="input" style="left:705px;top:654px;width:512px;height:66px;display:none" name="code" aria-label="Код из электронной почты" inputmode="text" autocomplete="one-time-code" placeholder=" ">
+      <label class="remember" style="left:745px;top:728px;width:435px;height:43px" aria-label="Запомнить меня"><input name="remember" type="checkbox"><span class="mark">✓</span></label>
+      <button class="hotspot pill" style="left:744px;top:804px;width:430px;height:68px" type="submit" aria-label="Прислать код на электронную почту" id="submit"></button>
+      <div id="stageStatus" role="status" aria-live="polite"></div>
+     </form>
+    </section>
+    <section id="register" class="controls" aria-label="Регистрация" hidden>
+     <button class="hotspot pill" style="left:160px;top:316px;width:187px;height:59px" data-go="entry" aria-label="Назад"></button>
+     <form id="registerForm" novalidate>
+      <input class="input" style="left:705px;top:445px;width:512px;height:66px" name="login" aria-label="Логин" placeholder=" " maxlength="64" autocomplete="username" required>
+      <input class="input" style="left:705px;top:548px;width:512px;height:66px" name="password" type="password" aria-label="Пароль" placeholder=" " maxlength="128" autocomplete="new-password" required>
+      <input class="input" style="left:705px;top:650px;width:512px;height:66px" name="email" type="email" aria-label="Адрес электронной почты" placeholder=" " autocomplete="email" required>
+      <button class="hotspot pill" style="left:744px;top:762px;width:430px;height:68px" type="submit" aria-label="Зарегистрироваться"></button>
+     </form>
+    </section>
+    <div id="successFX" hidden aria-hidden="true"><span id="successName"></span></div>
+   </div>
+  </div>
+ </div>
+ <div id="assist" aria-label="Управление обзором">
+  <button id="panLeft" type="button" aria-label="Сдвинуть вид влево">◀</button>
+  <span class="hint">Проведите вбок, чтобы увидеть всю арену</span>
+  <button id="panRight" type="button" aria-label="Сдвинуть вид вправо">▶</button>
+  <button id="fit" type="button" aria-label="Уместить всю арену">Обзор</button>
+  <button id="rotate" type="button" aria-label="Переключить масштаб">Масштаб</button>
+ </div>
+ <div id="alert" role="status" aria-live="polite" hidden></div>
+ <div id="sr" role="status" aria-live="polite"></div>
 </div>
 <script>
 (()=>{'use strict';
-const screens=[...document.querySelectorAll('.screen')],valid=new Set(screens.map(x=>x.id));let current='home',previous='home',account='',loggedIn=false;
-const $=(sel)=>document.querySelector(sel);
-function show(id){if(!valid.has(id))return; if(id===current)return;previous=current;current=id;for(const screen of screens){const on=screen.id===id;screen.classList.toggle('active',on);screen.setAttribute('aria-hidden',on?'false':'true');if(on)screen.scrollTop=0;}document.title=(id==='home'?'Территория хоккея':$('.screen.active h2')?.textContent||'Территория хоккея')+' — мобильная версия';}
-function goBack(){show(['home','menu'].includes(previous)?previous:'home')}
-document.addEventListener('click',e=>{const button=e.target.closest('button');if(!button)return;if(button.hasAttribute('data-back')){goBack();return;}const id=button.getAttribute('data-go');if(id)show(id);});
-const form=$('#loginForm'),codeField=$('#codeField'),submit=$('#loginSubmit'),authStatus=$('#authStatus');let codeRequested=false;
-const storeKey='hockey-mobile-remember';try{let remembered=JSON.parse(localStorage.getItem(storeKey)||'null');if(remembered&&typeof remembered.login==='string'){$('input[name="login"]').value=remembered.login;$('input[name="remember"]').checked=true;}}catch(_){/* local storage may be blocked when file:// is used */}
-function resetCode(){codeRequested=false;codeField.hidden=true;const code=$('input[name="code"]');code.required=false;code.value='';submit.textContent='ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ';authStatus.textContent='';}
-for(const input of [$('input[name="login"]'),$('input[name="password"]')])input.addEventListener('input',()=>{if(codeRequested)resetCode()});
-form.addEventListener('submit',e=>{e.preventDefault();if(!form.reportValidity())return;let login=$('input[name="login"]').value.trim();if(!login){authStatus.textContent='Введите логин.';return}if(!codeRequested){codeRequested=true;codeField.hidden=false;$('input[name="code"]').required=true;submit.textContent='ВОЙТИ';authStatus.textContent='Демо-режим: введите любой непустой код.';return;}
-if(!$('input[name="code"]').value.trim()){authStatus.textContent='Введите код.';return;}account=login;loggedIn=true;try{if($('input[name="remember"]').checked)localStorage.setItem(storeKey,JSON.stringify({login}));else localStorage.removeItem(storeKey)}catch(_){/* storage optional */}
-$('#greeting').textContent='Игрок: '+account;$('#profileName').textContent='Логин: '+account+' (локальная демонстрационная сессия)';const name=$('#jerseyName');name.textContent=account;name.classList.remove('land');show('success');void name.offsetWidth;name.classList.add('land');const delay=matchMedia('(prefers-reduced-motion: reduce)').matches?300:1550;setTimeout(()=>{if(current==='success')show('menu')},delay);});
-$('#registerForm').addEventListener('submit',e=>{e.preventDefault();if(!e.currentTarget.reportValidity())return;$('#registerStatus').textContent='Демонстрация: регистрация на сервере не выполняется.';});
-$('#logout').addEventListener('click',()=>{loggedIn=false;account='';$('input[name="password"]').value='';resetCode();show('home');});
-// 18 tiny CSS-composited snow specks, not a costly animated canvas.
-if(!matchMedia('(prefers-reduced-motion: reduce)').matches){const snow=$('#snow'),f=document.createDocumentFragment();for(let i=0;i<18;i++){let s=document.createElement('i');const rnd=n=>(Math.sin(i*93.17+n*17.37)*43758.5453)%1;const norm=n=>Math.abs(rnd(n));s.style.setProperty('--x',norm(1)*100+'%');s.style.setProperty('--r',(1+norm(2)*2.3)+'px');s.style.setProperty('--d',(9+norm(3)*11)+'s');s.style.setProperty('--delay',(-norm(4)*20)+'s');s.style.setProperty('--wind',((norm(5)-.5)*150)+'px');f.append(s);}snow.append(f)}
+// Original desktop screenshots, not approximated or redrawn artwork.
+const base='https://raw.githubusercontent.com/Razebaloff/UKRTB_PopovD/main/COURSE_3/EP_TPaD_DB/App_C%23/';
+const images={entry:base+'Entry_Preview.jpg',menu:base+'Menu_Preview.jpg',login:base+'Login_Preview.png',loginCode:base+'Login_Code_Preview.png',register:base+'Registration_Preview.png'};
+const $=selector=>document.querySelector(selector);
+const stage=$('#stage'),box=$('#box'),pan=$('#pan'),artwork=$('#artwork'),alert=$('#alert');
+const sections=['entry','login','register','menu'];
+let page='entry',codeRequested=false,username='',magnified=true,successTimeout=0,noticeTimeout=0,loadSequence=0;
+const memoryKey='territory-hockey-mobile-user';
+let reduceMotion=matchMedia('(prefers-reduced-motion:reduce)').matches;
+const size={w:1920,h:1080};
+function layout(focus){
+ const w=pan.clientWidth,h=pan.clientHeight,fit=Math.min(w/size.w,h/size.h);
+ // In portrait mode the stage can be panned horizontally; no button becomes tiny.
+ const s=(!magnified||w>=h)?fit:Math.max(fit,Math.min(.90,h/size.h*.92));
+ const prior=(pan.scrollLeft+pan.clientWidth/2)/(box.clientWidth||1);
+ box.style.width=Math.round(s*size.w)+'px';box.style.height=Math.round(s*size.h)+'px';
+ stage.style.transform='scale('+s+')';
+ requestAnimationFrame(()=>{
+  let x=focus===undefined?Math.max(0,(prior*box.clientWidth-w/2)):focus*s-w/2;
+  if(w>=h||!magnified)x=0;
+  pan.scrollLeft=Math.max(0,Math.min(box.clientWidth-w,x));
+ });
+}
+function panTo(x){const scale=box.clientWidth/size.w;pan.scrollTo({left:Math.max(0,x*scale-pan.clientWidth/2),behavior:reduceMotion?'instant':'smooth'});}
+function activate(id){sections.forEach(name=>$('#'+name).hidden=name!==id)}
+function imageFor(id){return id==='login'&&codeRequested?'loginCode':id}
+function updateImage(){
+ const asset=imageFor(page),src=images[asset],token=++loadSequence;
+ artwork.style.opacity='1';artwork.src=src;
+ artwork.onerror=()=>{if(token===loadSequence)notice('Для оригинальной графики требуется интернет при первом открытии.',4500)};
+}
+function show(id,focus){
+ if(!sections.includes(id))return;
+ clearTimeout(successTimeout);$('#successFX').hidden=true;page=id;activate(id);updateImage();
+ $('#sr').textContent=({entry:'Главный экран',login:'Вход',register:'Регистрация',menu:'Главное меню'})[id];
+ requestAnimationFrame(()=>layout(focus??(id==='entry'?530:960)));
+}
+function notice(text,ms=2700){alert.textContent=text;alert.hidden=false;clearTimeout(noticeTimeout);noticeTimeout=setTimeout(()=>alert.hidden=true,ms)}
+function resetCode(){codeRequested=false;const code=$('#loginForm [name=code]');code.style.display='none';code.required=false;code.value='';$('#submit').setAttribute('aria-label','Прислать код на электронную почту');$('#stageStatus').textContent='';if(page==='login')updateImage()}
+const login=$('#loginForm');
+for(const name of ['login','password'])login.elements[name].addEventListener('input',()=>{if(codeRequested)resetCode()});
+try{let data=JSON.parse(localStorage.getItem(memoryKey)||'null');if(typeof data?.user==='string'&&data.remember){login.elements.login.value=data.user;login.elements.remember.checked=true}}catch(_){/* blocked on some file:// browsers */}
+login.addEventListener('submit',e=>{
+ e.preventDefault();const user=login.elements.login.value.trim(),pass=login.elements.password.value;
+ if(!user||!pass){notice('Введите логин и пароль');return}
+ if(!codeRequested){codeRequested=true;const code=login.elements.code;code.style.display='';code.required=true;$('#submit').setAttribute('aria-label','Войти');$('#stageStatus').textContent='Демо-режим: введите любой непустой код';updateImage();panTo(960);return}
+ if(!login.elements.code.value.trim()){notice('Введите код');return}
+ username=user;
+ try{if(login.elements.remember.checked)localStorage.setItem(memoryKey,JSON.stringify({user,remember:true}));else localStorage.removeItem(memoryKey)}catch(_){}
+ $('#stageStatus').textContent='';$('#successName').textContent=username;$('#successFX').hidden=false;
+ if(!reduceMotion)makeGust();
+ successTimeout=setTimeout(()=>{resetCode();show('menu',960)},reduceMotion?350:2580);
+});
+$('#registerForm').addEventListener('submit',e=>{e.preventDefault();const form=e.currentTarget;if(!form.elements.login.value.trim()||!form.elements.password.value||!form.elements.email.value.trim()){notice('Заполните все поля');return}if(!form.elements.email.checkValidity()){notice('Проверьте электронную почту');return}notice('Регистрация пока демонстрационная, данные не отправлены.',3900)});
+function makeGust(){const root=$('#snowFX');root.replaceChildren();const frag=document.createDocumentFragment();for(let i=0;i<40;i++){
+ const snow=document.createElement('i'),left=i%2===0,t=i/40;
+ snow.style.setProperty('--x',(left?0:1800)+(i%8)*13+'px');snow.style.setProperty('--y',(i%11)*13+'px');snow.style.setProperty('--r',(1.5+(i%5)*.8)+'px');snow.style.setProperty('--o',(.32+(i%7)*.07).toFixed(2));snow.style.setProperty('--vx',(left?1500:-1500)+'px');snow.style.setProperty('--vy',(830+(i%7)*42)+'px');snow.style.setProperty('--d',(1.4+(i%5)*.17)+'s');snow.style.setProperty('--delay',(t*.2)+'s');frag.append(snow);
+ }root.append(frag)}
+document.addEventListener('click',e=>{
+ const button=e.target.closest('button');if(!button)return;
+ const go=button.dataset.go;
+ if(go==='menu-schedule'){show('menu',1450);notice('Откройте «РАСПИСАНИЕ ЗАНЯТИЙ»');return}
+ if(go){show(go);return}
+ if(button.dataset.action){
+  const name=({rent:'Аренда',profile:'Профиль',info:'Информация',schedule:'Расписание'})[button.dataset.action];
+  notice(name+' — раздел пока не подключён',3500);
+ }
+});
+$('#panLeft').addEventListener('click',()=>pan.scrollBy({left:-Math.max(250,pan.clientWidth*.68),behavior:reduceMotion?'instant':'smooth'}));
+$('#panRight').addEventListener('click',()=>pan.scrollBy({left:Math.max(250,pan.clientWidth*.68),behavior:reduceMotion?'instant':'smooth'}));
+$('#fit').addEventListener('click',()=>{magnified=false;layout(960);notice('Вся арена помещается на экране. «Масштаб» — увеличит её.',2600)});
+$('#rotate').addEventListener('click',()=>{magnified=!magnified;layout(page==='entry'?530:960)});
+window.addEventListener('resize',()=>layout());window.addEventListener('orientationchange',()=>setTimeout(()=>layout(),170));
 document.addEventListener('visibilitychange',()=>{$('#app').classList.toggle('paused',document.hidden)});
+layout(530);show('entry',530);
 })();
 </script>
 <style>.paused *, .paused *::before, .paused *::after{animation-play-state:paused!important}</style>
