@@ -28,7 +28,7 @@ namespace LP_PopovD_App
         private static PointF Polar(float angle, float radius)
             => new(165 + MathF.Cos(angle) * radius, 165 + MathF.Sin(angle) * radius);
 
-        internal static void DrawPuck(Graphics g, Rectangle bounds, string text, bool highlighted, bool pressed)
+        internal static void DrawPuck(Graphics g, Rectangle bounds, string text, bool highlighted, bool pressed, bool drawCaption = true)
         {
             GraphicsState saved = g.Save();
             float diameter = Math.Min(bounds.Width, bounds.Height);
@@ -79,7 +79,8 @@ namespace LP_PopovD_App
                 using SolidBrush shade = new(Color.FromArgb(35, 0, 0, 0));
                 g.FillEllipse(shade, body);
             }
-            RinkTypography.DrawPuckCaption(g, text, new RectangleF(10, 10 + (pressed ? 2 : 0), 310, 310));
+            if (drawCaption)
+                RinkTypography.DrawPuckCaption(g, text, new RectangleF(10, 10 + (pressed ? 2 : 0), 310, 310));
             g.Restore(saved);
         }
     }
