@@ -231,14 +231,9 @@ namespace LP_PopovD_App
                 if (cache != surfaces || IsDisposed || Disposing) return;
                 StickFeedbackDrawing.Prepare(ClientSize);
                 stickBackdrop?.Dispose();
-                stickBackdrop = CaptureScreen();
-                // Убираем только неподвижную пару; снимок сохраняет введённые данные и маскировку пароля.
-                Rectangle region = StickFeedbackDrawing.PixelBounds(ClientSize);
-                using (Graphics g = Graphics.FromImage(stickBackdrop))
-                {
-                    g.CompositingMode = CompositingMode.SourceCopy;
-                    g.DrawImage(sceneCache!, region, region, GraphicsUnit.Pixel);
-                }
+                // Сразу снимаем фон без неподвижных клюшек. Прямоугольное
+                // стирание поверх готового снимка создавало видимый квадрат.
+                stickBackdrop = CaptureScreen(withoutSticks: true);
                 Action action = () => { };
                 if (target.HasValue) action = () => _ = NavigateAsync(target.Value, Center(button), button == entryScheduleButton);
                 else if (button == submitButton) action = () => _ = SubmitAuthAsync();
@@ -265,7 +260,7 @@ namespace LP_PopovD_App
 
         internal void PaintScene(Graphics graphics) => PaintScene(graphics, ClientRectangle);
 
-        internal void PaintScene(Graphics graphics, Rectangle sourceBounds)
+        internal void PaintScene(Graphics graphics, Rectangle sourceBounds, bool withoutSticks = false)
         {
             GraphicsState saved = graphics.Save();
             if (sceneCache == null)
@@ -285,7 +280,8 @@ namespace LP_PopovD_App
             graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
-            if (screen != AppScreen.Menu) StickFeedbackDrawing.Draw(graphics, ClientSize);
+            if (screen != AppScreen.Menu && !withoutSticks)
+                StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
             {
                 RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
@@ -383,7 +379,7 @@ namespace LP_PopovD_App
             AcceptButton = entry ? entryButton : auth ? submitButton : null;
         }
 
-        private Bitmap CaptureScreen()
+        private Bitmap CaptureScreen(bool withoutSticks = false)
         {
             // Не вызываем DrawToBitmap для всей полноэкранной формы: это заставляло
             // WinForms синхронно обходить и перерисовывать все дочерние HWND.
@@ -391,7 +387,7 @@ namespace LP_PopovD_App
             Bitmap image = new(ClientSize.Width, ClientSize.Height, PixelFormat.Format32bppPArgb);
             image.SetResolution(96, 96);
             using Graphics g = Graphics.FromImage(image);
-            PaintScene(g, ClientRectangle);
+            PaintScene(g, ClientRectangle, withoutSticks);
             foreach (Control control in Controls)
             {
                 if (!control.Visible || control.Width < 1 || control.Height < 1 ||
