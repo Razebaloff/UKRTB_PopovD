@@ -16,8 +16,8 @@ namespace LP_PopovD_App
         private TransitionFrameRenderer? transitionRenderer;
         private bool revealOnly, focusCodeAfterTransition, scheduleFocus, exporting;
         private readonly Stopwatch transitionClock = new(), stickClock = Stopwatch.StartNew(),
-            successClock = new(), lavaClock = Stopwatch.StartNew();
-        private readonly System.Windows.Forms.Timer transitionTimer, stickTimer, successTimer, lavaTimer;
+            successClock = new();
+        private readonly System.Windows.Forms.Timer transitionTimer, stickTimer, successTimer;
         private readonly StickAnimationState stickAnimation = new();
         private readonly LoginFlowState loginFlow = new();
         private readonly RememberedLoginStore preferences = new();
@@ -69,14 +69,6 @@ namespace LP_PopovD_App
                     CompleteLoginAnimation();
                 else Invalidate();
             };
-            lavaTimer = new System.Windows.Forms.Timer(components!) { Interval = 65 };
-            lavaTimer.Tick += (_, _) =>
-            {
-                if (!shown || loading || IsDisposed || Disposing || !Visible ||
-                    WindowState == FormWindowState.Minimized || sceneCache == null ||
-                    transitionFrom != null || loginSuccess != null || stickAnimation.Active) return;
-                Invalidate(ToPixels(new RectangleF(28, 28, 1544, 744)));
-            };
             loginInput = new CapsuleInput("Логин", "ВВЕДИТЕ ЛОГИН") { TabIndex = 0 };
             passwordInput = new CapsuleInput("Пароль", "ВВЕДИТЕ ПАРОЛЬ", password: true, maxLength: 128) { TabIndex = 1 };
             emailInput = new CapsuleInput("Электронная почта", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ", maxLength: 254) { TabIndex = 2 };
@@ -114,7 +106,6 @@ namespace LP_PopovD_App
             base.OnShown(e);
             shown = true;
             SetFullScreen(true);
-            lavaTimer.Start();
             await LoadSceneAsync();
         }
 
@@ -290,9 +281,6 @@ namespace LP_PopovD_App
             graphics.PixelOffsetMode = PixelOffsetMode.None;
             graphics.DrawImage(sceneCache, new Rectangle(Point.Empty, sourceBounds.Size), sourceBounds, GraphicsUnit.Pixel);
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
-            LavaUnderIceDrawing.Draw(graphics, ClientSize, screen,
-                screen == AppScreen.Login && loginFlow.CodeRequested,
-                lavaClock.Elapsed.TotalSeconds, withoutSticks);
             if (screen != AppScreen.Menu && !withoutSticks)
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
@@ -324,8 +312,6 @@ namespace LP_PopovD_App
             loginSuccess?.Dispose(); loginSuccess = null;
             stickAnimation.Cancel(); stickClock.Stop();
             StickFeedbackDrawing.Dispose();
-            LavaUnderIceDrawing.Dispose();
-            lavaClock.Stop();
         }
 
         private Rectangle ToPixels(RectangleF bounds)
@@ -727,7 +713,7 @@ namespace LP_PopovD_App
         {
             base.OnFormClosing(e);
             if (e.Cancel) return;
-            transitionTimer.Stop(); stickTimer.Stop(); successTimer.Stop(); lavaTimer.Stop();
+            transitionTimer.Stop(); stickTimer.Stop(); successTimer.Stop();
             surfaces?.Dispose(); surfaces = null;
             stickAnimation.Cancel();
         }
