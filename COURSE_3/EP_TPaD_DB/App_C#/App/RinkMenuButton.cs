@@ -26,6 +26,7 @@ namespace LP_PopovD_App
             Cursor = Cursors.Hand;
             AccessibleRole = AccessibleRole.PushButton;
             frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost.SetVisible(Visible);
         }
 
         protected override void OnResize(EventArgs e)
@@ -75,7 +76,8 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;
             g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
-            if (frost.Amount > .002f)
+            float ambient = frost.Ambient * (1 - frost.Amount);
+            if (ambient > .002f || frost.Amount > .002f)
             {
                 if (frostTexture == null || frostTextureSize != ClientSize)
                 {
@@ -83,8 +85,12 @@ namespace LP_PopovD_App
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
                 }
-                FrostDrawing.Draw(g, frostTexture, ClientRectangle, frost.Amount, true);
+                if (ambient > .002f)
+                    FrostDrawing.Draw(g, frostTexture, ClientRectangle, ambient, true);
+                if (frost.Amount > .002f)
+                    FrostDrawing.DrawIceShell(g, frostTexture, ClientRectangle, frost.Amount, true);
             }
+            DrawCaptionOnTop(g, pressed);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -95,7 +101,11 @@ namespace LP_PopovD_App
                 using SolidBrush glow = new(Color.FromArgb(alpha, RinkDrawing.Blue));
                 g.FillEllipse(glow, 5, 5, Math.Max(1, Width - 10), Math.Max(1, Height - 10));
             }
-            Color ink = pressed ? Color.FromArgb(9, 49, 96) : ForeColor;
+        }
+
+        protected virtual void DrawCaptionOnTop(Graphics g, bool down)
+        {
+            Color ink = down ? Color.FromArgb(9, 49, 96) : ForeColor;
             RinkTypography.Draw(g, Text, new RectangleF(0, 0, Width, Height), ink);
         }
 
@@ -162,7 +172,7 @@ namespace LP_PopovD_App
 
         protected override void OnVisibleChanged(EventArgs e)
         {
-            if (!Visible) frost?.Reset();
+            frost?.SetVisible(Visible);
             base.OnVisibleChanged(e);
         }
 
