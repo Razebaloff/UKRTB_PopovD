@@ -450,93 +450,228 @@ namespace LP_PopovD_App
             }
         }
 
+        // Единая геометрия воздушных потоков: верхние углы -> область
+        // полей ввода -> соответствующие нижние углы. По ней рисуется
+        // сама метель и вычисляется поле скорости для обломков интерфейса.
+        private static PointF WindPath(bool left, float lane, float progress)
+        {
+            lane = Math.Clamp(lane, 0, 1);
+            float t = Math.Clamp(progress, 0, 1);
+            float spread = lane - .5f;
+            PointF start = new(-115 + lane * 170, -120 + lane * 52);
+            PointF approach = new(320 + spread * 160, 105 + lane * 35);
+            PointF turn = new(720 + spread * 270, 435 + spread * 140);
+            PointF departure = new(370 + spread * 170, 665 + lane * 35);
+            PointF finish = new(-135 + lane * 235, 900 + spread * 100);
+            PointF sample = t <= .5f
+                ? Quadratic(start, approach, turn, 2 * t)
+                : Quadratic(turn, departure, finish, 2 * t - 1);
+            return left ? sample : new PointF(1600 - sample.X, sample.Y);
+        }
+
+        private static PointF Quadratic(PointF a, PointF b, PointF c, float t)
+        {
+            float q = 1 - t;
+            return new PointF(q * q * a.X + 2 * q * t * b.X + t * t * c.X,
+                q * q * a.Y + 2 * q * t * b.Y + t * t * c.Y);
+        }
+
+        private static PointF WindTangent(bool left, float lane, float progress)
+        {
+            float before = Math.Max(0, progress - .006f);
+            float after = Math.Min(1, progress + .006f);
+            PointF a = WindPath(left, lane, before);
+            PointF b = WindPath(left, lane, after);
+            float dx = b.X - a.X, dy = b.Y - a.Y;
+            float length = MathF.Max(.001f, MathF.Sqrt(dx * dx + dy * dy));
+            return new PointF(dx / length, dy / length);
+        }
+
+        private static float WindIntensity(float time)
+        {
+            // Сначала начинается метель, затем сильный порыв подхватывает
+            // порошок из растворяющихся полей и постепенно стихает.
+            return SnowDrawing.Smooth((time - .055f) / .27f) *
+                (1 - SnowDrawing.Smooth((time - 1.57f) / .53f));
+        }
+
+        // Ветер как векторное поле, а не заданный заранее путь отдельных частиц.
+        // Скорость направлена по касательной к видимой снежной струе;
+        // поперечная составляющая затягивает частицы в её широкую зону.
+        private static PointF WindVelocity(PointF particle, float time, bool left,
+            float lane, float phase, float speed)
+        {
+            float strength = WindIntensity(time);
+            if (strength <= .0001f) return PointF.Empty;
+
+            // У потока монотонная вертикальная координата. Двоичный
+            // поиск находит участок видимой струи напротив частицы.
+            float low = 0, high = 1;
+            for (int j = 0; j < 7; j++)
+            {
+                float mid = (low + high) * .5f;
+                if (WindPath(left, lane, mid).Y < particle.Y) low = mid;
+                else high = mid;
+            }
+            float t = (low + high) * .5f;
+            PointF central = WindPath(left, lane, t);
+            PointF direction = WindTangent(left, lane, t);
+            float gust = .82f + .14f * MathF.Sin(time * 10.5f + phase) +
+                .09f * MathF.Sin(time * 18f + lane * 9f);
+            float velocity = (770 + speed * 190) * strength * gust;
+            float pullX = Math.Clamp((central.X - particle.X) * .68f, -205, 205);
+            float pullY = Math.Clamp((central.Y - particle.Y) * .42f, -115, 115);
+            float eddy = MathF.Sin(time * 14f + phase + particle.Y * .009f) * 38 * strength;
+            return new PointF(direction.X * velocity + pullX * strength -
+                direction.Y * eddy, direction.Y * velocity + pullY * strength +
+                direction.X * eddy);
+        }
+
         private void DrawWind(Graphics g, float time)
         {
-            if (time > 2.10f) return;
-            using SolidBrush brush = new(Color.White);
+            float intensity = WindIntensity(time);
+            if (intensity <= .001f) return;
+            using SolidBrush grains = new(Color.White);
             using Pen streak = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            // Две снежные струи выходят из верхних углов, закручиваются у майки
-            // и уходят в соответствующие нижние углы.
+            using Pen vapor = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using GraphicsPath ribbon = new();
+
+            // Несколько широких, частично перекрывающихся ветровых рукавов
+            // с мягкой дымкой и тонкой яркой сердцевиной, вместо отдельных
+            // узких полос и снежинок на пустом фоне.
+            for (int side = 0; side < 2; side++)
+                for (int band = 0; band < 7; band++)
+                {
+                    bool left = side == 0;
+                    float lane = (band + .5f) / 7;
+                    ribbon.Reset();
+                    for (int k = 0; k <= 28; k++)
+                    {
+                        float p = k / 28f;
+                        PointF point = WindPath(left, lane, p);
+                        float bend = MathF.Sin(time * 8.3f + band * 1.4f + p * 13f) *
+                            6.5f * MathF.Sin(p * MathF.PI);
+                        point.X += bend;
+                        if (k == 0) ribbon.StartFigure();
+                        else
+                        {
+                            PointF prev = WindPath(left, lane, (k - 1) / 28f);
+                            float oldBend = MathF.Sin(time * 8.3f + band * 1.4f +
+                                (k - 1) / 28f * 13f) * 6.5f *
+                                MathF.Sin((k - 1) / 28f * MathF.PI);
+                            prev.X += oldBend;
+                            ribbon.AddLine(prev, point);
+                        }
+                    }
+                    vapor.Color = Color.FromArgb((int)(7 * intensity), 178, 226, 250);
+                    vapor.Width = 66 + band % 3 * 21;
+                    g.DrawPath(vapor, ribbon);
+                    vapor.Color = Color.FromArgb((int)(13 * intensity), 222, 246, 255);
+                    vapor.Width = 22 + band % 3 * 8;
+                    g.DrawPath(vapor, ribbon);
+                    vapor.Color = Color.FromArgb((int)(30 * intensity), 247, 253, 255);
+                    vapor.Width = 1.2f + (band % 3) * .5f;
+                    g.DrawPath(vapor, ribbon);
+                }
+
+            // Взвесь внутри тех же рукавов. Направление коротких следов
+            // рассчитывается из касательной к общей геометрии ветра.
             for (int i = 0; i < squall.Length; i++)
             {
                 SnowSeed seed = squall[i];
-                float age = (time - .035f - seed.Phase * .42f) / (1.18f + seed.Speed * .28f);
+                float age = (time - .015f - seed.Phase * .42f) / (1.24f + seed.Speed * .24f);
                 if (age <= 0 || age >= 1) continue;
                 bool left = i % 2 == 0;
-                float startX = left ? -45 + seed.X * 200 : 1645 - seed.X * 200;
-                float startY = -110 + seed.Y * 125;
-                float controlX = left ? 650 + seed.X * 165 : 950 - seed.X * 165;
-                float controlY = 190 + seed.Y * 110;
-                float endX = left ? -125 + seed.X * 180 : 1725 - seed.X * 180;
-                float endY = 810 + seed.Y * 110;
-                float q = 1 - age;
-                float x = q * q * startX + 2 * q * age * controlX + age * age * endX;
-                float y = q * q * startY + 2 * q * age * controlY + age * age * endY;
-                float eddy = MathF.Sin(seed.Angle + age * 19) * 11 * MathF.Sin(age * MathF.PI);
-                x += eddy;
-                float dx = (2 * q * (controlX - startX) + 2 * age * (endX - controlX)) * .018f;
-                float dy = (2 * q * (controlY - startY) + 2 * age * (endY - controlY)) * .018f;
-                float opacity = MathF.Sin(age * MathF.PI) * (.38f + seed.Speed * .38f);
-                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius * 1.25f, dx, dy, opacity);
-                if (i % 4 == 0)
-                    DrawSnowflake(g, streak, x, y, 2.4f + seed.Radius * 1.8f, (int)(opacity * 210));
+                float lane = .08f + seed.X * .84f;
+                PointF center = WindPath(left, lane, age);
+                PointF direction = WindTangent(left, lane, age);
+                float spread = (seed.Y - .5f) * (65 + 95 * MathF.Sin(age * MathF.PI));
+                float x = center.X - direction.Y * spread;
+                float y = center.Y + direction.X * spread;
+                float drift = MathF.Sin(time * 15f + seed.Angle + age * 9f) *
+                    12f * MathF.Sin(age * MathF.PI);
+                x += -direction.Y * drift;
+                y += direction.X * drift;
+                float opacity = intensity * MathF.Sin(age * MathF.PI) *
+                    (.35f + seed.Speed * .38f);
+                SnowDrawing.Grain(g, grains, streak, x, y,
+                    seed.Radius * 1.28f, direction.X * (3 + seed.Speed * 4),
+                    direction.Y * (3 + seed.Speed * 4), opacity);
+                if (i % 7 == 0)
+                    DrawSnowflake(g, streak, x, y, 2 + seed.Radius * 1.8f,
+                        (int)(200 * opacity));
             }
-            // Сорванная с полей ледяная пыль повторяет поток ветра к нижним краям.
+
+            // Мелкая пыль также живёт внутри широкого потока.
             for (int i = 0; i < wind.Length; i++)
             {
                 SnowSeed seed = wind[i];
-                float age = (time - .15f - seed.Phase * .38f) / (1.05f + seed.Y * .21f);
+                float age = (time - .075f - seed.Phase * .34f) / (1.20f + seed.Speed * .19f);
                 if (age <= 0 || age >= 1) continue;
-                RectangleF field = fields[i % fields.Length];
-                float side = seed.X < .5f ? -1 : 1;
-                float startX = field.X + seed.X * field.Width, startY = field.Y + seed.Y * field.Height;
-                float endX = side < 0 ? -55 : 1655, endY = 825 + seed.Y * 80;
-                float controlX = startX + side * (170 + seed.Speed * 100), controlY = startY + 85;
-                float q = 1 - age;
-                float x = q * q * startX + 2 * q * age * controlX + age * age * endX;
-                float y = q * q * startY + 2 * q * age * controlY + age * age * endY;
-                x += MathF.Sin(seed.Angle + age * 15) * 12 * MathF.Sin(age * MathF.PI);
-                float dx = (2 * q * (controlX - startX) + 2 * age * (endX - controlX)) * .013f;
-                float dy = (2 * q * (controlY - startY) + 2 * age * (endY - controlY)) * .013f;
-                float opacity = MathF.Sin(age * MathF.PI) * (.30f + seed.Speed * .42f);
-                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius, dx, dy, opacity);
-                if (i % 17 == 0)
-                    DrawSnowflake(g, streak, x, y, 2 + seed.Radius * 1.5f, (int)(opacity * 170));
+                bool left = (i & 1) == 0;
+                float lane = .03f + seed.Y * .94f;
+                PointF center = WindPath(left, lane, age);
+                PointF direction = WindTangent(left, lane, age);
+                float offset = (seed.X - .5f) * 170;
+                float x = center.X - direction.Y * offset;
+                float y = center.Y + direction.X * offset;
+                SnowDrawing.Grain(g, grains, streak, x, y,
+                    seed.Radius * .85f, direction.X * 4, direction.Y * 4,
+                    intensity * MathF.Sin(age * MathF.PI) * (.22f + seed.Speed * .27f));
             }
         }
 
-        // Текстура полей исчезает попиксельно, а отсоединённая микропыль
-        // подхватывается встречными потоками в два нижних угла.
+        // Частицы не телепортируются по заранее рассчитанной кривой.
+        // От момента отделения от поля до текущего кадра их координаты
+        // численно интегрируются из ТОГО ЖЕ векторного поля, которое
+        // направляет визуальные снежные струи.
         private void DrawDust(Graphics g, float time)
         {
-            if (time >= 1.7f) return;
+            if (time > 2.15f) return;
             using SolidBrush grains = new(Color.White);
             using Pen streak = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+
             for (int i = 0; i < dust.Length; i++)
             {
                 SnowSeed seed = dust[i];
-                float age = (time - .08f - seed.Phase * .36f) / (.70f + .28f * seed.Speed);
-                if (age <= 0 || age >= 1) continue;
+                float born = .11f + seed.Phase * .60f;
+                float age = time - born;
+                if (age <= 0 || age >= 1.45f) continue;
+
                 RectangleF source = fields[i % fields.Length];
-                float fromX = source.Left + seed.X * source.Width;
-                float fromY = source.Top + seed.Y * source.Height;
-                float side = fromX < 800 ? -1 : 1;
-                float destX = side < 0 ? -45 : 1645;
-                float destY = 850 + 30 * seed.Y;
-                float phase = SnowDrawing.Smooth(age);
-                float q = 1 - phase;
-                float anchorX = fromX + side * (95 + seed.Speed * 90);
-                float anchorY = fromY - 55 - 40 * seed.Speed;
-                float x = q * q * fromX + 2 * q * phase * anchorX + phase * phase * destX;
-                float y = q * q * fromY + 2 * q * phase * anchorY + phase * phase * destY;
-                x += 11 * MathF.Sin(seed.Angle + age * 18) * MathF.Sin(MathF.PI * age);
-                y += 5 * MathF.Cos(seed.Angle + age * 12) * MathF.Sin(MathF.PI * age);
-                float vx = (destX - anchorX) * .012f;
-                float vy = (destY - anchorY) * .011f;
-                float strength = MathF.Sin(MathF.PI * age) * (.34f + seed.Speed * .50f);
-                SnowDrawing.Grain(g, grains, streak, x, y,
-                    seed.Radius * (.32f + (1 - age) * .55f),
-                    vx, vy, strength, i % 29 == 0);
+                float startX = source.Left + seed.X * source.Width;
+                float startY = source.Top + seed.Y * source.Height;
+                bool left = startX < 800;
+                float lane = .10f + seed.Y * .80f;
+                PointF position = new(startX, startY);
+
+                float life = Math.Min(age, 1.38f);
+                int steps = Math.Max(1, (int)MathF.Ceiling(life / .038f));
+                float stepTime = life / steps;
+                for (int step = 0; step < steps; step++)
+                {
+                    float at = born + step * stepTime;
+                    PointF v = WindVelocity(position, at, left, lane, seed.Angle, seed.Speed);
+                    // Пока ветер не подошёл, частицы остаются у поверхности,
+                    // а не начинают самостоятельно двигаться в угол.
+                    position.X += v.X * stepTime;
+                    position.Y += v.Y * stepTime;
+                }
+
+                if (position.X < -24 || position.X > 1624 ||
+                    position.Y < -24 || position.Y > 824) continue;
+
+                PointF velocityNow = WindVelocity(position, time, left, lane, seed.Angle, seed.Speed);
+                float speed = MathF.Sqrt(velocityNow.X * velocityNow.X +
+                    velocityNow.Y * velocityNow.Y);
+                float strength = Math.Clamp(speed / 750f, 0, 1) *
+                    (1 - SnowDrawing.Smooth((age - .94f) / .51f)) *
+                    SnowDrawing.Smooth(age / .12f);
+
+                SnowDrawing.Grain(g, grains, streak, position.X, position.Y,
+                    seed.Radius * (.28f + (1 - Math.Min(age, 1)) * .59f),
+                    velocityNow.X * .010f, velocityNow.Y * .010f,
+                    strength * (.46f + seed.Speed * .35f), i % 23 == 0);
             }
         }
 
