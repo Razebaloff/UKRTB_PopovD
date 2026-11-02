@@ -86,7 +86,7 @@ namespace LP_PopovD_App
         internal static void Draw(Graphics g, Size size, AppScreen screen, double seconds)
         {
             if (size.Width < 2 || size.Height < 2) return;
-            lava ??= MakeTexture();
+            Bitmap sheet = lava ??= MakeTexture();
             GraphicsState saved = g.Save();
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             g.TranslateTransform(canvas.X, canvas.Y);
@@ -95,9 +95,9 @@ namespace LP_PopovD_App
             g.SetClip(rink, CombineMode.Intersect);
             // Удерживаем лаву физически ПОД майкой, а не поверх полей и текста.
             if (screen is AppScreen.Login or AppScreen.Registration)
-                g.ExcludeClip(JerseyFabricDrawing.PaintBounds);
+                g.ExcludeClip(Rectangle.Round(JerseyFabricDrawing.PaintBounds));
             if (screen == AppScreen.Menu)
-                g.ExcludeClip(new RectangleF(660, 275, 280, 250));
+                g.ExcludeClip(new Rectangle(660, 275, 280, 250));
 
             g.InterpolationMode = InterpolationMode.Bilinear;
             g.PixelOffsetMode = PixelOffsetMode.None;
@@ -105,7 +105,7 @@ namespace LP_PopovD_App
             float vertical = (float)((seconds * 6.5) % Tile);
             for (int y = -Tile; y < 900; y += Tile)
                 for (int x = -Tile; x < 1700; x += Tile)
-                    g.DrawImageUnscaled(lava, (int)(x + drift), (int)(y + vertical));
+                    g.DrawImage(sheet, new RectangleF(x + drift, y + vertical, Tile, Tile));
 
             // Лёд поверх горячих трещин: приглушение света голубоватой
             // матовой плёнкой создаёт ощущение глубины, а не огня на льду.
