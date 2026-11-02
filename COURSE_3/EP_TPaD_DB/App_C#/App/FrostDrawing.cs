@@ -225,71 +225,37 @@ namespace LP_PopovD_App
             return bitmap;
         }
 
-        internal static void Draw(Graphics g, Bitmap texture, Rectangle bounds, float amount, bool round)
+        // На каждом кадре выполняется только одна альфа-композиция
+        // заранее подготовленной кристаллической текстуры: без сотен
+        // случайных фигур, сложных масок и повторного рендеринга фактуры.
+        internal static void DrawLayer(Graphics g, Bitmap texture, Rectangle bounds, float opacity)
         {
-            if (amount <= .002f || bounds.Width < 5 || bounds.Height < 5) return;
-            float p = SnowDrawing.Smooth(Math.Clamp(amount, 0, 1));
+            if (opacity <= .002f || bounds.Width < 5 || bounds.Height < 5) return;
             GraphicsState saved = g.Save();
-            RectangleF outer = new(bounds.X + 1, bounds.Y + 1, bounds.Width - 2, bounds.Height - 2);
-            using GraphicsPath silhouette = Shape(outer, round);
-            g.SetClip(silhouette, CombineMode.Intersect);
-            using SolidBrush frostMist = new(Color.FromArgb((int)(19 * p), 217, 241, 254));
-            g.FillPath(frostMist, silhouette);
             using ImageAttributes alpha = new();
-            alpha.SetColorMatrix(new ColorMatrix { Matrix33 = .18f + .77f * p });
-            g.InterpolationMode = InterpolationMode.Bilinear;
-
-            void Paint()
+            alpha.SetColorMatrix(new ColorMatrix
             {
-                g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height,
-                    GraphicsUnit.Pixel, alpha);
-            }
-
-            if (p >= .995f)
-            {
-                Paint(); // После завершения прогресса покрыта ВСЯ поверхность.
-            }
-            else
-            {
-                float radius = Math.Min(outer.Width, outer.Height) * .5f;
-                float inset = Math.Max(.1f, radius * p);
-                using GraphicsPath outerBand = new() { FillMode = FillMode.Alternate };
-                outerBand.AddPath(silhouette, false);
-                RectangleF center = RectangleF.Inflate(outer, -inset, -inset);
-                if (center.Width > 1 && center.Height > 1)
-                {
-                    using GraphicsPath inner = Shape(center, round);
-                    outerBand.AddPath(inner, false);
-                }
-                GraphicsState bandState = g.Save();
-                g.SetClip(outerBand, CombineMode.Intersect);
-                Paint();
-                g.Restore(bandState);
-
-                // Отдельные очаги кристаллизации, которые растут не синхронно.
-                // Их форма и координаты повторяемы, но хаотично распределены.
-                using GraphicsPath islands = new(FillMode.Winding);
-                Random random = new(unchecked(bounds.Width * 7927 + bounds.Height * 1013 + (round ? 1987 : 1297)));
-                for (int i = 0; i < 46; i++)
-                {
-                    float threshold = random.NextSingle() * .75f;
-                    float growth = Math.Clamp((p - threshold) / (.9f - threshold), 0, 1);
-                    float span = (3 + random.NextSingle() * (round ? 27 : 15)) * growth;
-                    float x = outer.Left + random.NextSingle() * outer.Width;
-                    float y = outer.Top + random.NextSingle() * outer.Height;
-                    if (span > .1f)
-                        islands.AddEllipse(x - span, y - span * (.5f + random.NextSingle() * .45f),
-                            span * 2, span * (1.1f + random.NextSingle() * .9f));
-                }
-                if (islands.PointCount > 0)
-                {
-                    GraphicsState islandState = g.Save();
-                    g.SetClip(islands, CombineMode.Intersect);
-                    Paint();
-                    g.Restore(islandState);
-                }
-            }
+                Matrix33 = Math.Clamp(opacity, 0, 1)
+            });
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height,
+                GraphicsUnit.Pixel, alpha);
             g.Restore(saved);
+        }
+
+        internal static void Draw(Graphics g, Bitmap texture, Rectangle bounds, float amount, bool round)
+            => DrawLayer(g, texture, bounds, SnowDrawing.Smooth(Math.Clamp(amount, 0, 1)));
+
+        // Ледяная корка готовится ОДИН раз при изменении размера кнопки.
+        // На каждом кадре её прозрачность плавно интерполируется.
+        internal static Bitmap CreateIceLayer(Bitmap frost, bool round)
+        {
+            Bitmap result = new(frost.Width, frost.Height, PixelFormat.Format32bppPArgb);
+            result.SetResolution(96, 96);
+            using Graphics g = Graphics.FromImage(result);
+            DrawIceShell(g, frost, new Rectangle(0, 0, result.Width, result.Height), 1, round);
+            return result;
         }
 
         // При наведении создаётся голубоватая полупрозрачная ледяная корка:
