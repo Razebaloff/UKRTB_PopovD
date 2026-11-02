@@ -4,26 +4,50 @@ using System.Drawing.Imaging;
 
 namespace LP_PopovD_App
 {
-    // На всех кнопках фоновый иней появляется и тает синхронно,
-    // по общему монотонному времени без индивидуального фазового сдвига.
-    // При hover фон уступает место плотной прозрачной ледяной корке.
+    // Один UI-таймер для всех кнопок: кадры синхронны, а количество
+    // отдельных WinForms Timer не растёт с числом видимых элементов.
     internal sealed class FrostHoverAnimation : IDisposable
     {
         private static readonly Stopwatch sharedTime = Stopwatch.StartNew();
-        private readonly System.Windows.Forms.Timer timer;
+        private static readonly HashSet<FrostHoverAnimation> active = new();
+        private static readonly System.Windows.Forms.Timer sharedTimer = CreateTimer();
         private readonly Stopwatch transition = new();
         private readonly Action invalidate;
         private float from, target;
-        private bool active;
+        private bool visible, disposed;
+        private float lastAmbient = -1;
 
         internal float Amount { get; private set; }
+
+        private static System.Windows.Forms.Timer CreateTimer()
+        {
+            System.Windows.Forms.Timer timer = new() { Interval = 16 };
+            timer.Tick += (_, _) => TickAll();
+            return timer;
+        }
+
+        private static void TickAll()
+        {
+            // На UI-потоке без дополнительных задач и ThreadPool.
+            foreach (FrostHoverAnimation item in active)
+            {
+                item.UpdateAmount();
+                float ambient = item.Ambient;
+                bool hovering = item.transition.IsRunning;
+                if (hovering || MathF.Abs(item.lastAmbient - ambient) >= .003f)
+                {
+                    item.lastAmbient = ambient;
+                    item.invalidate();
+                }
+            }
+        }
+
         internal float Ambient
         {
             get
             {
-                if (!active) return 0;
+                if (!visible) return 0;
                 float t = (float)(sharedTime.Elapsed.TotalSeconds % 6.6) / 6.6f;
-                // Замерзание, непродолжительное удержание, таяние и пауза.
                 return t < .34f ? .80f * SnowDrawing.Smooth(t / .34f)
                     : t < .48f ? .80f
                     : t < .80f ? .80f * (1 - SnowDrawing.Smooth((t - .48f) / .32f))
@@ -31,25 +55,32 @@ namespace LP_PopovD_App
             }
         }
 
-        internal FrostHoverAnimation(Action invalidate)
-        {
-            this.invalidate = invalidate;
-            timer = new System.Windows.Forms.Timer { Interval = 65 };
-            timer.Tick += (_, _) => Tick();
-        }
+        internal FrostHoverAnimation(Action invalidate) => this.invalidate = invalidate;
 
-        internal void SetVisible(bool visible)
+        internal void SetVisible(bool value)
         {
-            if (active == visible) return;
-            active = visible;
-            if (visible) timer.Start();
-            else { timer.Stop(); Reset(); }
+            if (disposed || visible == value) return;
+            visible = value;
+            if (value)
+            {
+                active.Add(this);
+                if (!sharedTimer.Enabled) sharedTimer.Start();
+                lastAmbient = -1;
+                invalidate();
+            }
+            else
+            {
+                active.Remove(this);
+                if (active.Count == 0) sharedTimer.Stop();
+                Reset();
+            }
         }
 
         internal void SetTarget(bool hovered)
         {
+            if (disposed) return;
             float next = hovered ? 1 : 0;
-            if (Math.Abs(target - next) < .001f) return;
+            if (MathF.Abs(target - next) < .001f) return;
             UpdateAmount();
             from = Amount;
             target = next;
@@ -60,24 +91,28 @@ namespace LP_PopovD_App
         private void UpdateAmount()
         {
             if (!transition.IsRunning) return;
-            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 340f), 0, 1);
+            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 285f), 0, 1);
             Amount = from + (target - from) * SnowDrawing.Smooth(p);
-            if (p >= 1) { Amount = target; transition.Reset(); }
-        }
-
-        private void Tick()
-        {
-            UpdateAmount();
-            invalidate();
+            if (p >= 1)
+            {
+                Amount = target;
+                transition.Reset();
+            }
         }
 
         internal void Reset()
         {
             transition.Reset();
             Amount = from = target = 0;
+            lastAmbient = -1;
         }
 
-        public void Dispose() => timer.Dispose();
+        public void Dispose()
+        {
+            if (disposed) return;
+            SetVisible(false);
+            disposed = true;
+        }
     }
 
     // Статическую фактуру инея готовим один раз на размер кнопки.
