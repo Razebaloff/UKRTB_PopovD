@@ -80,6 +80,13 @@ namespace LP_PopovD_App
                     float heat = highlights
                         ? Math.Clamp(core * .75f + cracks * wide * .40f - .06f, 0, 1)
                         : Math.Clamp(wide * (.70f + cracks * .30f) + core * .28f, 0, 1);
+                    // Толстые бугры льда экранируют свечение, мягкими
+                    // природными пятнами, а не прямоугольными вырезами.
+                    float iceRelief = Noise(u, v, 3, 141) * .60f +
+                        Noise(u, v, 8, 277) * .27f +
+                        Noise(u, v, 19, 389) * .13f;
+                    float shielding = 1 - .94f * Smooth(.57f, .72f, iceRelief);
+                    heat *= shielding;
                     float grit = .64f + .36f * crust;
                     float alpha = highlights
                         ? (10 + 97 * heat * grit) * MathF.Pow(heat, 1.1f)
