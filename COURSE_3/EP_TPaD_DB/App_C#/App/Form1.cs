@@ -353,7 +353,7 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
-            submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД";
+            submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
             submitButton.AccessibleName = submitButton.Text;
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
