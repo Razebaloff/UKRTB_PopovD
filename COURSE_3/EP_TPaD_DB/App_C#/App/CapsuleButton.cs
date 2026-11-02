@@ -55,7 +55,7 @@ namespace LP_PopovD_App
             g.FillPath(fill, shape);
             g.DrawPath(edge, shape);
             // Длинная надпись должна полностью помещаться в овальную кнопку.
-            float measured = g.MeasureString(Text, Font, Width, center).Width;
+            float measured = g.MeasureString(Text, Font, new PointF(0, 0), center).Width;
             if (measured > Width - 20)
             {
                 using Font fitted = new(RinkTypography.FamilyName,
