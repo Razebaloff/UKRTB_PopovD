@@ -7,7 +7,9 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer;
+        private Bitmap? buttonLayer, frostTexture;
+        private readonly FrostHoverAnimation frost;
+        private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
         protected override bool ShowFocusCues => false;
 
@@ -23,11 +25,15 @@ namespace LP_PopovD_App
             UseVisualStyleBackColor = false;
             Cursor = Cursors.Hand;
             AccessibleRole = AccessibleRole.PushButton;
+            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
+            frostTexture?.Dispose();
+            frostTexture = null;
+            frostTextureSize = Size.Empty;
             if (Width < 2 || Height < 2)
                 return;
             using GraphicsPath shape = new();
@@ -69,6 +75,16 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;
             g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
+            if (frost.Amount > .002f)
+            {
+                if (frostTexture == null || frostTextureSize != ClientSize)
+                {
+                    frostTexture?.Dispose();
+                    frostTextureSize = ClientSize;
+                    frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
+                }
+                FrostDrawing.Draw(g, frostTexture, ClientRectangle, frost.Amount, true);
+            }
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -86,6 +102,7 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
+            frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
@@ -94,6 +111,7 @@ namespace LP_PopovD_App
         {
             hovered = false;
             pressed = false;
+            frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -142,9 +160,20 @@ namespace LP_PopovD_App
             base.OnKeyUp(e);
         }
 
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            if (!Visible) frost?.Reset();
+            base.OnVisibleChanged(e);
+        }
+
         protected override void Dispose(bool disposing)
         {
-            if (disposing) buttonLayer?.Dispose();
+            if (disposing)
+            {
+                frost?.Dispose();
+                frostTexture?.Dispose();
+                buttonLayer?.Dispose();
+            }
             base.Dispose(disposing);
         }
     }
