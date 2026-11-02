@@ -7,10 +7,11 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer, frostTexture, iceTexture;
+        private Bitmap? buttonLayer, captionLayer, frostTexture, iceTexture;
         private readonly FrostHoverAnimation frost;
         private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
+        private (Size Size, string Text, int Color, bool Pressed) captionKey;
         protected override bool ShowFocusCues => false;
 
         public RinkMenuButton()
@@ -92,7 +93,23 @@ namespace LP_PopovD_App
                 if (frost.Amount > .002f && iceTexture != null)
                     FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
-            DrawCaptionOnTop(g, pressed);
+            // Построение контура надписи — дорогая операция GDI+.
+            // Выполняем её при изменении текста/размера/нажатия, а
+            // промежуточные кадры инея используют готовый прозрачный спрайт.
+            var labelKey = (ClientSize, Text, ForeColor.ToArgb(), pressed);
+            if (captionLayer == null || captionKey != labelKey)
+            {
+                captionLayer?.Dispose();
+                captionLayer = new Bitmap(Width, Height,
+                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                captionLayer.SetResolution(96, 96);
+                using Graphics type = Graphics.FromImage(captionLayer);
+                type.SmoothingMode = SmoothingMode.AntiAlias;
+                type.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                DrawCaptionOnTop(type, pressed);
+                captionKey = labelKey;
+            }
+            g.DrawImageUnscaled(captionLayer, 0, 0);
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -185,6 +202,7 @@ namespace LP_PopovD_App
                 frost?.Dispose();
                 frostTexture?.Dispose();
                 iceTexture?.Dispose();
+                captionLayer?.Dispose();
                 buttonLayer?.Dispose();
             }
             base.Dispose(disposing);
