@@ -227,8 +227,9 @@ namespace LP_PopovD_App
             float sinceContact = Math.Max(0, time - ContactSeconds);
             float settle = time >= ContactSeconds ? MathF.Sin(sinceContact * 26) * MathF.Exp(-sinceContact * 13) : 0;
             PointF position = new(initial.X, initial.Y + (landed.Y - initial.Y) * drop + settle * 2.5f);
-            float grow = 1 + (nameScale - 1) *
-                SnowDrawing.Smooth((time - .78f) / (ContactSeconds - .78f));
+            // Даже очень длинный логин сначала меньше конечного размера примерно втрое.
+            float grow = nameScale * (.34f + .66f *
+                SnowDrawing.Smooth((time - .78f) / (ContactSeconds - .78f)));
             float squash = time >= ContactSeconds ? 1 - .10f * MathF.Exp(-sinceContact * 17) : 1;
             float glowStrength = SnowDrawing.Smooth((time - .86f) / .28f) *
                 (1 - SnowDrawing.Smooth((time - 1.50f) / .36f));
