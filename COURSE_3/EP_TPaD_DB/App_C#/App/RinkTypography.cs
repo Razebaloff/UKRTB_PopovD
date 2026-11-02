@@ -4,14 +4,8 @@ namespace LP_PopovD_App
 {
     internal static class RinkTypography
     {
-        // Bahnschrift: строгий технический гротеск; Arial — безопасный резервный вариант.
-        internal static readonly string FamilyName = ResolveFamily();
-
-        private static string ResolveFamily()
-        {
-            try { using FontFamily font = new("Bahnschrift"); return font.Name; }
-            catch (ArgumentException) { return "Arial"; }
-        }
+        // Исходный шрифт интерфейса: Arial.
+        internal const string FamilyName = "Arial";
         private static float sharedPuckRadius;
 
         private static GraphicsPath PuckCaption(string text)
