@@ -10,8 +10,9 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
-        private Bitmap? frostTexture, iceTexture;
+        private Bitmap? frostTexture, iceTexture, captionLayer;
         private Size frostTextureSize;
+        private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
         [DefaultValue(false)]
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
@@ -45,6 +46,8 @@ namespace LP_PopovD_App
             iceTexture?.Dispose();
             frostTexture = iceTexture = null;
             frostTextureSize = Size.Empty;
+            captionLayer?.Dispose();
+            captionLayer = null;
         }
 
         protected override void OnVisibleChanged(EventArgs e)
@@ -70,8 +73,6 @@ namespace LP_PopovD_App
             if (pressed) color = Primary ? Color.FromArgb(10, 67, 108) : Color.FromArgb(206, 227, 240);
             using SolidBrush fill = new(color);
             using Pen edge = new(Color.FromArgb(145, 188, 214), 1.5f);
-            using SolidBrush ink = new(Primary ? Color.White : JerseyDrawing.InputInk);
-            using StringFormat center = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             g.FillPath(fill, shape);
             g.DrawPath(edge, shape);
             // Сначала нарастает иней по краям овальной тканевой вставки,
@@ -91,16 +92,34 @@ namespace LP_PopovD_App
                 if (frost.Amount > .002f && iceTexture != null)
                     FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
-            // Длинная надпись должна полностью помещаться в овальную кнопку.
-            float measured = g.MeasureString(Text, Font, new PointF(0, 0), center).Width;
-            if (measured > Width - 20)
+            var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
+            if (captionLayer == null || captionKey != labelKey)
             {
-                using Font fitted = new(RinkTypography.FamilyName,
-                    Math.Max(11, Font.Size * (Width - 20) / Math.Max(1, measured)),
-                    FontStyle.Bold, GraphicsUnit.Pixel);
-                g.DrawString(Text, fitted, ink, ClientRectangle, center);
+                captionLayer?.Dispose();
+                captionLayer = new Bitmap(Width, Height,
+                    System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                captionLayer.SetResolution(96, 96);
+                using Graphics label = Graphics.FromImage(captionLayer);
+                label.SmoothingMode = SmoothingMode.AntiAlias;
+                label.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                using SolidBrush ink = new(Primary ? Color.White : JerseyDrawing.InputInk);
+                using StringFormat center = new()
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                float measured = label.MeasureString(Text, Font, new PointF(0, 0), center).Width;
+                if (measured > Width - 20)
+                {
+                    using Font fitted = new(RinkTypography.FamilyName,
+                        Math.Max(11, Font.Size * (Width - 20) / Math.Max(1, measured)),
+                        FontStyle.Bold, GraphicsUnit.Pixel);
+                    label.DrawString(Text, fitted, ink, ClientRectangle, center);
+                }
+                else label.DrawString(Text, Font, ink, ClientRectangle, center);
+                captionKey = labelKey;
             }
-            else g.DrawString(Text, Font, ink, ClientRectangle, center);
+            g.DrawImageUnscaled(captionLayer, 0, 0);
         }
         protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
@@ -115,6 +134,7 @@ namespace LP_PopovD_App
                 frost?.Dispose();
                 frostTexture?.Dispose();
                 iceTexture?.Dispose();
+                captionLayer?.Dispose();
                 labelFont?.Dispose();
             }
             base.Dispose(disposing);
