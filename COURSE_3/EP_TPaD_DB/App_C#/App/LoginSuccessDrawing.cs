@@ -8,10 +8,12 @@ namespace LP_PopovD_App
     {
         internal const int DurationMilliseconds = 2600;
         internal const float ContactSeconds = 1.86f;
-        private readonly Size size;
-        private readonly Bitmap before, clean, letters, glow, printed;
-        private readonly List<(Bitmap Image, Rectangle Bounds, float Delay)> pieces = new();
+        private readonly Size size, displaySize;
+        private readonly Bitmap before, clean, reducedBefore, reducedClean, overlayBuffer, letters, glow, printed;
+        private readonly Graphics overlayGraphics;
+        private readonly List<(Bitmap Image, Rectangle Bounds, float Delay, float Drift, float Sway)> pieces = new();
         private readonly SnowSeed[] wind = SnowDrawing.Seeds(252, 81624);
+        private readonly SnowSeed[] squall = SnowDrawing.Seeds(176, 73591);
         private readonly SnowSeed[] powder = SnowDrawing.Seeds(132, 22147);
         private readonly PointF[] glyphPoints;
         private readonly float spriteScale, nameScale;
@@ -21,10 +23,17 @@ namespace LP_PopovD_App
 
         internal LoginSuccessDrawing(Size size, Bitmap before, Bitmap clean, string login)
         {
-            this.size = size;
+            displaySize = size;
+            int width = Math.Min(size.Width, 960);
+            this.size = new Size(width, Math.Max(1, (int)MathF.Round(size.Height * width / (float)size.Width)));
             this.before = before;
             this.clean = clean;
-            RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
+            reducedBefore = Reduced(before, this.size);
+            reducedClean = Reduced(clean, this.size);
+            overlayBuffer = new Bitmap(this.size.Width, this.size.Height, PixelFormat.Format32bppPArgb);
+            overlayBuffer.SetResolution(96, 96);
+            overlayGraphics = Graphics.FromImage(overlayBuffer);
+            RectangleF canvas = RinkDrawing.GetCanvasBounds(this.size);
             spriteScale = Math.Max(1, canvas.Width / 1600 * 1.5f);
             using GraphicsPath path = new();
             using FontFamily family = new(RinkTypography.FamilyName);
@@ -36,7 +45,8 @@ namespace LP_PopovD_App
             using (Matrix center = new(fit, 0, 0, fit, -(b.X + b.Width / 2) * fit, -(b.Y + b.Height / 2) * fit))
                 path.Transform(center);
             b = path.GetBounds();
-            nameScale = Math.Min(1.68f, 440 / Math.Max(1, b.Width));
+            // Имя увеличивается заметно (до 3.7 раза), но всегда помещается на спине майки.
+            nameScale = Math.Min(3.7f, 440 / Math.Max(1, b.Width));
             letterBounds = new RectangleF(b.X - 20, b.Y - 24, b.Width + 40, b.Height + 48);
             letters = LetterSprite(path, false);
             glow = LetterSprite(path, true);
@@ -50,6 +60,18 @@ namespace LP_PopovD_App
             AddPieces(JerseyDrawing.LoginStatusBounds, 8);
         }
 
+        private static Bitmap Reduced(Bitmap original, Size requested)
+        {
+            Bitmap result = new(requested.Width, requested.Height, PixelFormat.Format32bppPArgb);
+            result.SetResolution(96, 96);
+            using Graphics g = Graphics.FromImage(result);
+            g.CompositingMode = CompositingMode.SourceCopy;
+            g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+            g.DrawImage(original, new Rectangle(Point.Empty, requested), 0, 0,
+                original.Width, original.Height, GraphicsUnit.Pixel);
+            return result;
+        }
+
         private void AddPieces(RectangleF sceneBounds, int columns)
         {
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
@@ -57,16 +79,23 @@ namespace LP_PopovD_App
             Rectangle bounds = Rectangle.Intersect(new Rectangle(Point.Empty, size), Rectangle.Ceiling(new RectangleF(
                 canvas.X + (sceneBounds.X - 3) * scale, canvas.Y + (sceneBounds.Y - 3) * scale,
                 (sceneBounds.Width + 6) * scale, (sceneBounds.Height + 6) * scale)));
-            for (int i = 0; i < columns; i++)
-            {
-                int left = bounds.Left + bounds.Width * i / columns;
-                int right = bounds.Left + bounds.Width * (i + 1) / columns;
-                Rectangle strip = new(left, bounds.Top, right - left, bounds.Height);
-                if (strip.Width < 1 || strip.Height < 1) continue;
-                Bitmap image = before.Clone(strip, PixelFormat.Format32bppPArgb);
-                float delay = .06f + Math.Abs(i - (columns - 1) / 2f) / columns * .16f;
-                pieces.Add((image, strip, delay));
-            }
+            // Мелкие фрагменты с разными задержками и траекториями, а не исчезающие полосы.
+            const int rows = 3;
+            for (int row = 0; row < rows; row++)
+                for (int col = 0; col < columns; col++)
+                {
+                    int left = bounds.Left + bounds.Width * col / columns;
+                    int right = bounds.Left + bounds.Width * (col + 1) / columns;
+                    int top = bounds.Top + bounds.Height * row / rows;
+                    int bottom = bounds.Top + bounds.Height * (row + 1) / rows;
+                    Rectangle tile = new(left, top, right - left, bottom - top);
+                    if (tile.Width < 1 || tile.Height < 1) continue;
+                    Bitmap image = reducedBefore.Clone(tile, PixelFormat.Format32bppPArgb);
+                    uint hash = (uint)(col * 2246822519u + row * 3266489917u + bounds.Left * 668265263u);
+                    float jitter = (hash & 255) / 255f;
+                    float delay = .10f + .20f * jitter + .07f * row;
+                    pieces.Add((image, tile, delay, .62f + jitter * .75f, (hash >> 8 & 255) / 255f));
+                }
         }
 
         private Bitmap LetterSprite(GraphicsPath path, bool halo)
@@ -97,13 +126,13 @@ namespace LP_PopovD_App
             Bitmap result = mask.Clone(new Rectangle(Point.Empty, mask.Size), PixelFormat.Format32bppPArgb);
             // Свет и плетение берутся из ткани в месте будущей надписи, один раз до начала анимации.
             float scale = canvas.Width / 1600;
-            Rectangle region = Rectangle.Intersect(new Rectangle(Point.Empty, clean.Size), Rectangle.Ceiling(new RectangleF(
+            Rectangle region = Rectangle.Intersect(new Rectangle(Point.Empty, reducedClean.Size), Rectangle.Ceiling(new RectangleF(
                 canvas.X + (landed.X + letterBounds.X * nameScale) * scale,
                 canvas.Y + (landed.Y + letterBounds.Y * nameScale) * scale,
                 letterBounds.Width * nameScale * scale, letterBounds.Height * nameScale * scale)));
             using Bitmap cloth = new(result.Width, result.Height, PixelFormat.Format32bppPArgb);
             using (Graphics g = Graphics.FromImage(cloth))
-                g.DrawImage(clean, new Rectangle(Point.Empty, cloth.Size), region, GraphicsUnit.Pixel);
+                g.DrawImage(reducedClean, new Rectangle(Point.Empty, cloth.Size), region, GraphicsUnit.Pixel);
             Rectangle all = new(Point.Empty, result.Size);
             BitmapData data = result.LockBits(all, ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
             BitmapData texture = cloth.LockBits(all, ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
@@ -143,27 +172,48 @@ namespace LP_PopovD_App
         internal void Draw(Graphics g, float milliseconds)
         {
             GraphicsState state = g.Save();
-            CompositingMode mode = g.CompositingMode;
             try
             {
+                g.CompositingMode = CompositingMode.SourceCopy;
+                // Статичная ткань остаётся в нативном разрешении, а динамика — в лёгком буфере.
+                g.DrawImageUnscaled(milliseconds <= 0 ? before : clean, 0, 0);
+                if (milliseconds <= 0) return;
+                overlayGraphics.CompositingMode = CompositingMode.SourceCopy;
+                overlayGraphics.Clear(Color.Transparent);
+                overlayGraphics.CompositingMode = CompositingMode.SourceOver;
+                DrawCore(overlayGraphics, milliseconds);
                 g.CompositingMode = CompositingMode.SourceOver;
-                DrawCore(g, milliseconds);
+                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+                g.DrawImage(overlayBuffer, new Rectangle(Point.Empty, displaySize),
+                    0, 0, size.Width, size.Height, GraphicsUnit.Pixel);
             }
-            finally { g.Restore(state); g.CompositingMode = mode; }
+            finally { g.Restore(state); }
         }
 
         private void DrawCore(Graphics g, float milliseconds)
         {
             float time = Math.Clamp(milliseconds, 0, DurationMilliseconds) / 1000;
-            if (time <= 0) { g.DrawImageUnscaled(before, 0, 0); return; }
-            g.DrawImageUnscaled(clean, 0, 0);
             using ImageAttributes alpha = new();
             foreach (var piece in pieces)
             {
-                float opacity = 1 - SnowDrawing.Smooth((time - piece.Delay) / .70f);
-                if (opacity <= .001f) continue;
-                alpha.SetColorMatrix(new ColorMatrix { Matrix33 = opacity });
-                g.DrawImage(piece.Image, piece.Bounds, 0, 0, piece.Image.Width, piece.Image.Height, GraphicsUnit.Pixel, alpha);
+                float age = (time - piece.Delay) / (1.06f + .22f * piece.Drift);
+                if (age >= 1) continue;
+                float moved = SnowDrawing.Smooth(Math.Clamp(age, 0, 1));
+                float opacity = 1 - SnowDrawing.Smooth((age - .12f) / .74f);
+                if (opacity <= .002f) continue;
+                float side = piece.Bounds.X + piece.Bounds.Width / 2f < size.Width / 2f ? -1 : 1;
+                float reach = size.Width * (.20f + .20f * piece.Drift);
+                float dx = side * reach * moved +
+                    MathF.Sin(age * 13 + piece.Sway * MathF.Tau) * 13 * moved;
+                float dy = size.Height * (.35f + .30f * piece.Drift) * moved;
+                float scale = 1 - .38f * moved;
+                Rectangle dest = new((int)MathF.Round(piece.Bounds.X + dx),
+                    (int)MathF.Round(piece.Bounds.Y + dy),
+                    Math.Max(1, (int)MathF.Round(piece.Bounds.Width * scale)),
+                    Math.Max(1, (int)MathF.Round(piece.Bounds.Height * scale)));
+                alpha.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(opacity, 0, 1) });
+                g.DrawImage(piece.Image, dest, 0, 0, piece.Image.Width, piece.Image.Height,
+                    GraphicsUnit.Pixel, alpha);
             }
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             GraphicsState state = g.Save();
@@ -177,7 +227,8 @@ namespace LP_PopovD_App
             float sinceContact = Math.Max(0, time - ContactSeconds);
             float settle = time >= ContactSeconds ? MathF.Sin(sinceContact * 26) * MathF.Exp(-sinceContact * 13) : 0;
             PointF position = new(initial.X, initial.Y + (landed.Y - initial.Y) * drop + settle * 2.5f);
-            float grow = 1 + (nameScale - 1) * SnowDrawing.Smooth(falling);
+            float grow = 1 + (nameScale - 1) *
+                SnowDrawing.Smooth((time - .78f) / (ContactSeconds - .78f));
             float squash = time >= ContactSeconds ? 1 - .10f * MathF.Exp(-sinceContact * 17) : 1;
             float glowStrength = SnowDrawing.Smooth((time - .86f) / .28f) *
                 (1 - SnowDrawing.Smooth((time - 1.50f) / .36f));
@@ -218,48 +269,106 @@ namespace LP_PopovD_App
         private void DrawRays(Graphics g, PointF position, float scale, float strength, float time)
         {
             if (glyphPoints.Length == 0) return;
-            using Pen halo = new(Color.White, 2.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen light = new(Color.White, .6f);
-            for (int i = 0; i < 28; i++)
+            using Pen halo = new(Color.White, 3.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using Pen light = new(Color.White, .9f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            // 36 расходящихся лучей доходят до краёв экрана, с убывающей яркостью.
+            for (int i = 0; i < 36; i++)
             {
-                PointF point = glyphPoints[i * glyphPoints.Length / 28];
-                float angle = MathF.Atan2(point.Y * 4, point.X) + MathF.Sin(i * 1.7f) * .3f;
-                float pulse = .65f + .35f * MathF.Sin(time * 5 + i * 2.4f);
-                float length = (7 + i % 5 * 3) * strength * pulse;
-                float x = position.X + point.X * scale, y = position.Y + point.Y * scale;
-                float dx = MathF.Cos(angle) * length, dy = MathF.Sin(angle) * length;
-                halo.Color = Color.FromArgb((int)(24 * strength * pulse), 255, 255, 255);
-                light.Color = Color.FromArgb((int)(122 * strength * pulse), 255, 255, 255);
-                g.DrawLine(halo, x, y, x + dx, y + dy);
-                g.DrawLine(light, x, y, x + dx * .88f, y + dy * .88f);
+                PointF point = glyphPoints[i * glyphPoints.Length / 36];
+                float angle = i * MathF.Tau / 36 + MathF.Sin(i * 2.1f + time * 4) * .028f;
+                float ux = MathF.Cos(angle), uy = MathF.Sin(angle);
+                float x = position.X + point.X * scale;
+                float y = position.Y + point.Y * scale;
+                float widthReach = Math.Abs(ux) < .001f ? 10000 : (ux > 0 ? 1600 - x : -x) / ux;
+                float heightReach = Math.Abs(uy) < .001f ? 10000 : (uy > 0 ? 800 - y : -y) / uy;
+                float pulse = .8f + .2f * MathF.Sin(time * 8 + i * 2.4f);
+                float reach = Math.Max(0, Math.Min(widthReach, heightReach)) *
+                    (.92f + .08f * pulse) * SnowDrawing.Smooth((time - .87f) / .22f);
+                halo.Color = Color.FromArgb((int)(32 * strength * pulse), 245, 252, 255);
+                light.Color = Color.FromArgb((int)(125 * strength * pulse), 255, 255, 255);
+                g.DrawLine(halo, x, y, x + ux * reach, y + uy * reach);
+                for (int segment = 0; segment < 3; segment++)
+                {
+                    light.Color = Color.FromArgb((int)(100 * strength * pulse * (1 - segment * .28f)), 255, 255, 255);
+                    float a = reach * segment / 3, b = reach * (segment + 1) / 3;
+                    g.DrawLine(light, x + ux * a, y + uy * a, x + ux * b, y + uy * b);
+                }
+            }
+        }
+
+        private static void DrawSnowflake(Graphics g, Pen pen, float x, float y, float size, int alpha)
+        {
+            if (alpha < 4) return;
+            pen.Color = Color.FromArgb(Math.Clamp(alpha, 0, 255), 245, 252, 255);
+            pen.Width = .6f;
+            for (int arm = 0; arm < 6; arm++)
+            {
+                float a = arm * MathF.Tau / 6;
+                float ux = MathF.Cos(a), uy = MathF.Sin(a);
+                g.DrawLine(pen, x, y, x + ux * size, y + uy * size);
+                float bx = x + ux * size * .67f, by = y + uy * size * .67f;
+                for (int branch = -1; branch <= 1; branch += 2)
+                {
+                    float ba = a + branch * .62f;
+                    g.DrawLine(pen, bx, by,
+                        bx - MathF.Cos(ba) * size * .28f,
+                        by - MathF.Sin(ba) * size * .28f);
+                }
             }
         }
 
         private void DrawWind(Graphics g, float time)
         {
-            if (time > 1.65f) return;
+            if (time > 2.10f) return;
             using SolidBrush brush = new(Color.White);
             using Pen streak = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            // Две снежные струи выходят из верхних углов, закручиваются у майки
+            // и уходят в соответствующие нижние углы.
+            for (int i = 0; i < squall.Length; i++)
+            {
+                SnowSeed seed = squall[i];
+                float age = (time - .035f - seed.Phase * .42f) / (1.18f + seed.Speed * .28f);
+                if (age <= 0 || age >= 1) continue;
+                bool left = i % 2 == 0;
+                float startX = left ? -45 + seed.X * 200 : 1645 - seed.X * 200;
+                float startY = -110 + seed.Y * 125;
+                float controlX = left ? 650 + seed.X * 165 : 950 - seed.X * 165;
+                float controlY = 190 + seed.Y * 110;
+                float endX = left ? -125 + seed.X * 180 : 1725 - seed.X * 180;
+                float endY = 810 + seed.Y * 110;
+                float q = 1 - age;
+                float x = q * q * startX + 2 * q * age * controlX + age * age * endX;
+                float y = q * q * startY + 2 * q * age * controlY + age * age * endY;
+                float eddy = MathF.Sin(seed.Angle + age * 19) * 11 * MathF.Sin(age * MathF.PI);
+                x += eddy;
+                float dx = (2 * q * (controlX - startX) + 2 * age * (endX - controlX)) * .018f;
+                float dy = (2 * q * (controlY - startY) + 2 * age * (endY - controlY)) * .018f;
+                float opacity = MathF.Sin(age * MathF.PI) * (.38f + seed.Speed * .38f);
+                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius * 1.25f, dx, dy, opacity);
+                if (i % 4 == 0)
+                    DrawSnowflake(g, streak, x, y, 2.4f + seed.Radius * 1.8f, (int)(opacity * 210));
+            }
+            // Сорванная с полей ледяная пыль повторяет поток ветра к нижним краям.
             for (int i = 0; i < wind.Length; i++)
             {
                 SnowSeed seed = wind[i];
-                float age = (time - .08f - seed.Phase * .43f) / (1.04f + seed.Y * .18f);
+                float age = (time - .15f - seed.Phase * .38f) / (1.05f + seed.Y * .21f);
                 if (age <= 0 || age >= 1) continue;
                 RectangleF field = fields[i % fields.Length];
                 float side = seed.X < .5f ? -1 : 1;
                 float startX = field.X + seed.X * field.Width, startY = field.Y + seed.Y * field.Height;
-                float endX = side < 0 ? -40 : 1640, endY = 820 + seed.Y * 80;
+                float endX = side < 0 ? -55 : 1655, endY = 825 + seed.Y * 80;
+                float controlX = startX + side * (170 + seed.Speed * 100), controlY = startY + 85;
                 float q = 1 - age;
-                float controlX = startX + side * (80 + seed.Speed * 70);
-                float controlY = startY + 90;
                 float x = q * q * startX + 2 * q * age * controlX + age * age * endX;
                 float y = q * q * startY + 2 * q * age * controlY + age * age * endY;
-                x += MathF.Sin(seed.Angle + age * 12) * 8 * MathF.Sin(age * MathF.PI);
-                y += MathF.Cos(seed.Angle + age * 9) * 5 * MathF.Sin(age * MathF.PI);
-                float dx = (2 * q * (controlX - startX) + 2 * age * (endX - controlX)) * .012f;
-                float dy = (2 * q * (controlY - startY) + 2 * age * (endY - controlY)) * .012f;
-                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius, dx, dy,
-                    MathF.Sin(age * MathF.PI) * (.28f + seed.Speed * .37f), i % 19 == 0);
+                x += MathF.Sin(seed.Angle + age * 15) * 12 * MathF.Sin(age * MathF.PI);
+                float dx = (2 * q * (controlX - startX) + 2 * age * (endX - controlX)) * .013f;
+                float dy = (2 * q * (controlY - startY) + 2 * age * (endY - controlY)) * .013f;
+                float opacity = MathF.Sin(age * MathF.PI) * (.30f + seed.Speed * .42f);
+                SnowDrawing.Grain(g, brush, streak, x, y, seed.Radius, dx, dy, opacity);
+                if (i % 17 == 0)
+                    DrawSnowflake(g, streak, x, y, 2 + seed.Radius * 1.5f, (int)(opacity * 170));
             }
         }
 
@@ -294,6 +403,8 @@ namespace LP_PopovD_App
 
         public void Dispose()
         {
+            overlayGraphics.Dispose(); overlayBuffer.Dispose();
+            reducedBefore.Dispose(); reducedClean.Dispose();
             before.Dispose(); clean.Dispose(); letters.Dispose(); glow.Dispose(); printed.Dispose();
             foreach (var piece in pieces) piece.Image.Dispose();
             pieces.Clear();
