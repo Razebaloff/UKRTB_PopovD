@@ -7,7 +7,7 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer, frostTexture;
+        private Bitmap? buttonLayer, frostTexture, iceTexture;
         private readonly FrostHoverAnimation frost;
         private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
@@ -33,7 +33,8 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostTexture?.Dispose();
-            frostTexture = null;
+            iceTexture?.Dispose();
+            frostTexture = iceTexture = null;
             frostTextureSize = Size.Empty;
             if (Width < 2 || Height < 2)
                 return;
@@ -84,11 +85,12 @@ namespace LP_PopovD_App
                     frostTexture?.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
+                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, true);
                 }
                 if (ambient > .002f)
-                    FrostDrawing.Draw(g, frostTexture, ClientRectangle, ambient, true);
-                if (frost.Amount > .002f)
-                    FrostDrawing.DrawIceShell(g, frostTexture, ClientRectangle, frost.Amount, true);
+                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
+                if (frost.Amount > .002f && iceTexture != null)
+                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
             DrawCaptionOnTop(g, pressed);
         }
@@ -182,6 +184,7 @@ namespace LP_PopovD_App
             {
                 frost?.Dispose();
                 frostTexture?.Dispose();
+                iceTexture?.Dispose();
                 buttonLayer?.Dispose();
             }
             base.Dispose(disposing);
