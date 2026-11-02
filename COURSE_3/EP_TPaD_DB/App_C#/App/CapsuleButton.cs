@@ -26,6 +26,7 @@ namespace LP_PopovD_App
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
             frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost.SetVisible(Visible);
         }
         internal void SetScale(float scale)
         {
@@ -47,7 +48,7 @@ namespace LP_PopovD_App
 
         protected override void OnVisibleChanged(EventArgs e)
         {
-            if (!Visible) frost?.Reset();
+            frost?.SetVisible(Visible);
             base.OnVisibleChanged(e);
         }
 
@@ -74,7 +75,8 @@ namespace LP_PopovD_App
             g.DrawPath(edge, shape);
             // Сначала нарастает иней по краям овальной тканевой вставки,
             // затем поверх него остаётся хорошо читаемая надпись.
-            if (frost.Amount > .002f)
+            float ambient = frost.Ambient * (1 - frost.Amount);
+            if (ambient > .002f || frost.Amount > .002f)
             {
                 if (frostTexture == null || frostTextureSize != ClientSize)
                 {
@@ -82,7 +84,10 @@ namespace LP_PopovD_App
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
                 }
-                FrostDrawing.Draw(g, frostTexture, ClientRectangle, frost.Amount, false);
+                if (ambient > .002f)
+                    FrostDrawing.Draw(g, frostTexture, ClientRectangle, ambient, false);
+                if (frost.Amount > .002f)
+                    FrostDrawing.DrawIceShell(g, frostTexture, ClientRectangle, frost.Amount, false);
             }
             // Длинная надпись должна полностью помещаться в овальную кнопку.
             float measured = g.MeasureString(Text, Font, new PointF(0, 0), center).Width;
