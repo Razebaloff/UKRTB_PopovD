@@ -34,8 +34,7 @@ namespace LP_PopovD_App
             overlayBuffer = new Bitmap(this.size.Width, this.size.Height, PixelFormat.Format32bppPArgb);
             overlayBuffer.SetResolution(96, 96);
             overlayGraphics = Graphics.FromImage(overlayBuffer);
-            RectangleF canvas = RinkDrawing.GetCanvasBounds(this.size);
-            spriteScale = Math.Max(1, canvas.Width / 1600 * 1.5f);
+            RectangleF canvas = RinkDrawing.GetCanvasBounds(displaySize);
             using GraphicsPath path = new();
             using FontFamily family = new(RinkTypography.FamilyName);
             using StringFormat format = (StringFormat)StringFormat.GenericTypographic.Clone();
@@ -49,6 +48,10 @@ namespace LP_PopovD_App
             // Имя увеличивается заметно (до 3.7 раза), но всегда помещается на спине майки.
             nameScale = Math.Min(3.7f, 440 / Math.Max(1, b.Width));
             letterBounds = new RectangleF(b.X - 20, b.Y - 24, b.Width + 40, b.Height + 48);
+            // Кэш букв готовится с запасом деталей для их максимального размера
+            // на экране, а не для 960-пиксельного буфера снежной анимации.
+            spriteScale = Math.Min(18f, Math.Max(1.5f,
+                canvas.Width / 1600f * nameScale * 1.45f));
             letters = LetterSprite(path, false);
             glow = LetterSprite(path, true);
             printed = PrintedSprite(letters, canvas);
@@ -184,6 +187,8 @@ namespace LP_PopovD_App
             image.SetResolution(96, 96);
             using Graphics g = Graphics.FromImage(image);
             g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            g.CompositingQuality = CompositingQuality.HighQuality;
             g.ScaleTransform(spriteScale, spriteScale);
             g.TranslateTransform(-letterBounds.X, -letterBounds.Y);
             if (halo)
@@ -205,13 +210,18 @@ namespace LP_PopovD_App
             Bitmap result = mask.Clone(new Rectangle(Point.Empty, mask.Size), PixelFormat.Format32bppPArgb);
             // Свет и плетение берутся из ткани в месте будущей надписи, один раз до начала анимации.
             float scale = canvas.Width / 1600;
-            Rectangle region = Rectangle.Intersect(new Rectangle(Point.Empty, reducedClean.Size), Rectangle.Ceiling(new RectangleF(
+            Rectangle region = Rectangle.Intersect(new Rectangle(Point.Empty, clean.Size), Rectangle.Ceiling(new RectangleF(
                 canvas.X + (landed.X + letterBounds.X * nameScale) * scale,
                 canvas.Y + (landed.Y + letterBounds.Y * nameScale) * scale,
                 letterBounds.Width * nameScale * scale, letterBounds.Height * nameScale * scale)));
             using Bitmap cloth = new(result.Width, result.Height, PixelFormat.Format32bppPArgb);
             using (Graphics g = Graphics.FromImage(cloth))
-                g.DrawImage(reducedClean, new Rectangle(Point.Empty, cloth.Size), region, GraphicsUnit.Pixel);
+            {
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                if (region.Width > 0 && region.Height > 0)
+                    g.DrawImage(clean, new Rectangle(Point.Empty, cloth.Size), region, GraphicsUnit.Pixel);
+            }
             Rectangle all = new(Point.Empty, result.Size);
             BitmapData data = result.LockBits(all, ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
             BitmapData texture = cloth.LockBits(all, ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
@@ -227,10 +237,15 @@ namespace LP_PopovD_App
                         int a = (int)((uint)row[x] >> 24);
                         if (a == 0) continue;
                         uint c = (uint)material[x];
-                        float light = Math.Clamp(.57f + ((c >> 16 & 255) * .2126f + (c >> 8 & 255) * .7152f +
-                            (c & 255) * .0722f) / 75, .62f, 1);
-                        int r = (int)(235 * light * a / 255), green = (int)(241 * light * a / 255), b = (int)(245 * light * a / 255);
-                        row[x] = a << 24 | r << 16 | green << 8 | b;
+                        // Ткань задаёт лёгкую модуляцию цвета, но не размывает
+                        // контур: альфа-канал букв сохраняется без фильтрации.
+                        float luminance = (c >> 16 & 255) * .2126f +
+                            (c >> 8 & 255) * .7152f + (c & 255) * .0722f;
+                        float light = Math.Clamp(.91f + (luminance - 195) / 650f, .83f, 1.05f);
+                        int r = Math.Clamp((int)(235 * light * a / 255), 0, a);
+                        int green = Math.Clamp((int)(241 * light * a / 255), 0, a);
+                        int blue = Math.Clamp((int)(245 * light * a / 255), 0, a);
+                        row[x] = a << 24 | r << 16 | green << 8 | blue;
                     }
                     Marshal.Copy(row, 0, IntPtr.Add(data.Scan0, y * data.Stride), row.Length);
                 }
@@ -265,6 +280,9 @@ namespace LP_PopovD_App
                 g.InterpolationMode = InterpolationMode.HighQualityBilinear;
                 g.DrawImage(overlayBuffer, new Rectangle(Point.Empty, displaySize),
                     0, 0, size.Width, size.Height, GraphicsUnit.Pixel);
+                // Высокочёткие буквы и оптические лучи рисуются в нативном
+                // размере окна поверх малого буфера снега и растворения.
+                DrawName(g, milliseconds);
             }
             finally { g.Restore(state); }
         }
@@ -272,7 +290,6 @@ namespace LP_PopovD_App
         private void DrawCore(Graphics g, float milliseconds)
         {
             float time = Math.Clamp(milliseconds, 0, DurationMilliseconds) / 1000;
-            using ImageAttributes alpha = new();
             foreach (PanelDissolve panel in panels) panel.Draw(g, time);
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             GraphicsState state = g.Save();
@@ -282,6 +299,21 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.HighQualityBilinear;
             DrawWind(g, time);
             DrawDust(g, time);
+            g.Restore(state);
+        }
+
+        private void DrawName(Graphics g, float milliseconds)
+        {
+            float time = Math.Clamp(milliseconds, 0, DurationMilliseconds) / 1000f;
+            using ImageAttributes alpha = new();
+            RectangleF canvas = RinkDrawing.GetCanvasBounds(displaySize);
+            GraphicsState state = g.Save();
+            g.TranslateTransform(canvas.X, canvas.Y);
+            g.ScaleTransform(canvas.Width / 1600f, canvas.Height / 800f);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.CompositingQuality = CompositingQuality.HighQuality;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             float falling = Math.Clamp((time - 1.20f) / (ContactSeconds - 1.20f), 0, 1);
             float drop = falling * falling * falling;
             float sinceContact = Math.Max(0, time - ContactSeconds);
@@ -327,32 +359,72 @@ namespace LP_PopovD_App
             g.Restore(state);
         }
 
+        private static float RayNoise(int index)
+        {
+            uint value = unchecked((uint)index * 747796405u + 2891336453u);
+            value ^= value >> 16;
+            value = unchecked(value * 2246822519u);
+            value ^= value >> 13;
+            return (value & 65535u) / 65535f;
+        }
+
         private void DrawRays(Graphics g, PointF position, float scale, float strength, float time)
         {
-            if (glyphPoints.Length == 0) return;
-            using Pen halo = new(Color.White, 3.4f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen light = new(Color.White, .9f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            // 36 расходящихся лучей доходят до краёв экрана, с убывающей яркостью.
-            for (int i = 0; i < 36; i++)
+            if (glyphPoints.Length == 0 || strength <= .001f) return;
+            // Нерегулярные лучи выходят из разных точек контура букв.
+            // Каждый имеет собственные яркость, мерцание, размер и рассеяние.
+            using Pen halo = new(Color.White, 5) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using Pen beam = new(Color.White, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using Pen core = new(Color.White, .65f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            for (int i = 0; i < 42; i++)
             {
-                PointF point = glyphPoints[i * glyphPoints.Length / 36];
-                float angle = i * MathF.Tau / 36 + MathF.Sin(i * 2.1f + time * 4) * .028f;
+                float irregularity = RayNoise(i + 11);
+                float phase = RayNoise(i + 519) * MathF.Tau;
+                PointF contour = glyphPoints[(int)(RayNoise(i + 231) * (glyphPoints.Length - 1))];
+                float angle = i * MathF.Tau / 42f +
+                    (irregularity - .5f) * .15f + MathF.Sin(time * 3.4f + phase) * .016f;
                 float ux = MathF.Cos(angle), uy = MathF.Sin(angle);
-                float x = position.X + point.X * scale;
-                float y = position.Y + point.Y * scale;
-                float widthReach = Math.Abs(ux) < .001f ? 10000 : (ux > 0 ? 1600 - x : -x) / ux;
-                float heightReach = Math.Abs(uy) < .001f ? 10000 : (uy > 0 ? 800 - y : -y) / uy;
-                float pulse = .8f + .2f * MathF.Sin(time * 8 + i * 2.4f);
-                float reach = Math.Max(0, Math.Min(widthReach, heightReach)) *
-                    (.92f + .08f * pulse) * SnowDrawing.Smooth((time - .87f) / .22f);
-                halo.Color = Color.FromArgb((int)(32 * strength * pulse), 245, 252, 255);
-                light.Color = Color.FromArgb((int)(125 * strength * pulse), 255, 255, 255);
-                g.DrawLine(halo, x, y, x + ux * reach, y + uy * reach);
-                for (int segment = 0; segment < 3; segment++)
+                float x = position.X + contour.X * scale;
+                float y = position.Y + contour.Y * scale;
+                float reachX = Math.Abs(ux) < .0001f ? 10000f : (ux > 0 ? 1600 - x : -x) / ux;
+                float reachY = Math.Abs(uy) < .0001f ? 10000f : (uy > 0 ? 800 - y : -y) / uy;
+                float edgeDistance = Math.Max(0, Math.Min(reachX, reachY));
+                float shimmer = .82f + .18f * MathF.Sin(time * (5 + irregularity * 4) + phase);
+                float lengthFactor = i % 6 == 0 ? 1f : .32f + irregularity * .61f;
+                float extend = SnowDrawing.Smooth((time - .85f) / .26f);
+                float length = edgeDistance * lengthFactor * extend;
+                if (length < 1) continue;
+                float amount = strength * shimmer * (.47f + .53f * irregularity);
+                PointF end = new(x + ux * length, y + uy * length);
+
+                halo.Color = Color.FromArgb((int)(22 * amount), 218, 243, 255);
+                halo.Width = 3.5f + 2.4f * irregularity;
+                g.DrawLine(halo, x, y, end.X, end.Y);
+
+                // Основная полупрозрачная нить, более яркая у источника.
+                for (int segment = 0; segment < 4; segment++)
                 {
-                    light.Color = Color.FromArgb((int)(100 * strength * pulse * (1 - segment * .28f)), 255, 255, 255);
-                    float a = reach * segment / 3, b = reach * (segment + 1) / 3;
-                    g.DrawLine(light, x + ux * a, y + uy * a, x + ux * b, y + uy * b);
+                    float f0 = segment / 4f, f1 = (segment + 1) / 4f;
+                    float light = 1 - segment * .21f;
+                    beam.Color = Color.FromArgb((int)(103 * amount * light), 245, 252, 255);
+                    beam.Width = 1.1f + (1 - f0) * .7f;
+                    g.DrawLine(beam, x + ux * length * f0, y + uy * length * f0,
+                        x + ux * length * f1, y + uy * length * f1);
+                }
+
+                core.Color = Color.FromArgb((int)(165 * amount), 255, 255, 255);
+                g.DrawLine(core, x, y, x + ux * length * (.50f + .25f * irregularity),
+                    y + uy * length * (.50f + .25f * irregularity));
+
+                // Редкие вторичные рассеянные лучи, с небольшим отклонением.
+                if (i % 3 == 0)
+                {
+                    float deflection = (i % 2 == 0 ? 1 : -1) * (.055f + irregularity * .065f);
+                    float ax = MathF.Cos(angle + deflection), ay = MathF.Sin(angle + deflection);
+                    float branch = length * (.24f + irregularity * .17f);
+                    float sx = x + ux * length * .13f, sy = y + uy * length * .13f;
+                    core.Color = Color.FromArgb((int)(49 * amount), 229, 248, 255);
+                    g.DrawLine(core, sx, sy, sx + ax * branch, sy + ay * branch);
                 }
             }
         }
