@@ -9,7 +9,13 @@ namespace LP_PopovD_App
             g.SmoothingMode = SmoothingMode.AntiAlias;
             float s = bounds.Height / 28;
             float side = 20 * s;
-            RectangleF box = new(bounds.X + 2 * s, bounds.Y + (bounds.Height - side) / 2, side, side);
+            using Font fallback = new(RinkTypography.FamilyName, 17 * s, FontStyle.Bold, GraphicsUnit.Pixel);
+            Font labelFont = font ?? fallback;
+            float textWidth = g.MeasureString("ЗАПОМНИТЬ МЕНЯ", labelFont,
+                new PointF(0, 0), StringFormat.GenericTypographic).Width;
+            float total = side + 11 * s + textWidth;
+            float left = bounds.X + Math.Max(2 * s, (bounds.Width - total) / 2);
+            RectangleF box = new(left, bounds.Y + (bounds.Height - side) / 2, side, side);
             using SolidBrush fill = new(highlighted ? Color.FromArgb(67, 102, 129) : Color.FromArgb(28, 53, 77));
             using Pen edge = new(Color.FromArgb(205, 226, 240), Math.Max(1, 1.3f * s));
             g.FillRectangle(fill, box);
@@ -21,11 +27,10 @@ namespace LP_PopovD_App
                 g.DrawLines(tick, new[] { new PointF(box.X + 4 * s, box.Y + 10 * s),
                     new PointF(box.X + 8 * s, box.Y + 14 * s), new PointF(box.X + 16 * s, box.Y + 5 * s) });
             }
-            using Font fallback = new(RinkTypography.FamilyName, 17 * s, FontStyle.Bold, GraphicsUnit.Pixel);
             using SolidBrush ink = new(Color.FromArgb(230, 242, 250));
             using StringFormat format = new() { LineAlignment = StringAlignment.Center };
             g.DrawString("ЗАПОМНИТЬ МЕНЯ", font ?? fallback, ink,
-                new RectangleF(box.Right + 11 * s, bounds.Y, bounds.Width - side - 15 * s, bounds.Height), format);
+                new RectangleF(box.Right + 11 * s, bounds.Y, Math.Max(textWidth + 4 * s, bounds.Right - box.Right - 11 * s), bounds.Height), format);
         }
     }   
 }
