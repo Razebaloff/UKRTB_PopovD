@@ -62,7 +62,7 @@ namespace LP_PopovD_App
                 JerseyFieldDrawing.DrawCue(g, inputs[i], prompts[i]);
             if (!registration) RememberCheckDrawing.Draw(g, RememberBounds, false, false);
             DrawCapsule(g, registration ? SubmitBounds : LoginSubmitBounds,
-                registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : codeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД", true);
+                registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : codeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ", true);
             DrawCapsule(g, BackBounds, "НАЗАД", false);
         }
 
@@ -73,7 +73,8 @@ namespace LP_PopovD_App
             using Pen edge = new(primary ? Color.FromArgb(177, 214, 237) : Color.FromArgb(146, 181, 203), 1.8f);
             g.FillPath(fill, path);
             g.DrawPath(edge, path);
-            using Font font = new(RinkTypography.FamilyName, primary ? 22 : 21,
+            using Font font = new(RinkTypography.FamilyName,
+                primary && text.Length > 22 ? 17 : primary ? 22 : 21,
                 FontStyle.Bold, GraphicsUnit.Pixel);
             using SolidBrush ink = new(primary ? Color.White : InputInk);
             using StringFormat centered = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
