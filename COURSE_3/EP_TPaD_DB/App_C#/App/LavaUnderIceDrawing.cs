@@ -12,6 +12,7 @@ namespace LP_PopovD_App
         private const int Tile = 512;
         private static Bitmap? river, glints;
         private static readonly Dictionary<(AppScreen Screen, bool CodeRequested), Bitmap> foreground = new();
+        private static readonly Dictionary<(AppScreen Screen, bool CodeRequested), Bitmap> foregroundWithoutSticks = new();
 
         private static uint Hash(int x, int y, int seed)
         {
@@ -180,15 +181,17 @@ namespace LP_PopovD_App
             {
                 // Для вращения клюшек сам фон захватывается без них.
                 // Неподвижные клюшки отрисуются отдельно после захвата.
-                using Bitmap noSticks = ForegroundWithoutSticks(screen, codeRequested);
-                g.DrawImage(noSticks, canvas, new Rectangle(0, 0, 1600, 800), GraphicsUnit.Pixel);
+                Bitmap noSticks = ForegroundWithoutSticks(screen, codeRequested);
+                g.DrawImage(noSticks, canvas, new RectangleF(0, 0, 1600, 800), GraphicsUnit.Pixel);
             }
-            else g.DrawImage(top, canvas, new Rectangle(0, 0, 1600, 800), GraphicsUnit.Pixel);
+            else g.DrawImage(top, canvas, new RectangleF(0, 0, 1600, 800), GraphicsUnit.Pixel);
             g.Restore(saved);
         }
 
         private static Bitmap ForegroundWithoutSticks(AppScreen screen, bool codeRequested)
         {
+            var key = (screen, codeRequested);
+            if (foregroundWithoutSticks.TryGetValue(key, out Bitmap? cached)) return cached;
             Bitmap bitmap = new(1600, 800, PixelFormat.Format32bppPArgb);
             bitmap.SetResolution(96, 96);
             using Graphics g = Graphics.FromImage(bitmap);
@@ -206,6 +209,7 @@ namespace LP_PopovD_App
                     break;
                 case AppScreen.Menu: RinkDrawing.Draw(g); break;
             }
+            foregroundWithoutSticks.Add(key, bitmap);
             return bitmap;
         }
 
@@ -216,6 +220,8 @@ namespace LP_PopovD_App
             river = glints = null;
             foreach (Bitmap bitmap in foreground.Values) bitmap.Dispose();
             foreground.Clear();
+            foreach (Bitmap bitmap in foregroundWithoutSticks.Values) bitmap.Dispose();
+            foregroundWithoutSticks.Clear();
         }
     }
 }
