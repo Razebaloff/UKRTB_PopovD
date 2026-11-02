@@ -13,6 +13,8 @@ namespace LP_PopovD_App
         private readonly Graphics overlayGraphics;
         private readonly List<PanelDissolve> panels = new();
         private readonly SnowSeed[] dust = SnowDrawing.Seeds(380, 81230);
+        private readonly PointF[][] dustPaths;
+        private const float DustStepSeconds = .03f;
         private readonly SnowSeed[] wind = SnowDrawing.Seeds(252, 81624);
         private readonly SnowSeed[] squall = SnowDrawing.Seeds(176, 73591);
         private readonly SnowSeed[] powder = SnowDrawing.Seeds(132, 22147);
@@ -62,6 +64,10 @@ namespace LP_PopovD_App
             AddPanel(JerseyDrawing.RememberBounds);
             AddPanel(JerseyDrawing.BackBounds);
             AddPanel(JerseyDrawing.LoginStatusBounds);
+            // Путь каждого зерна рассчитывается один раз, без численного
+            // интегрирования сотен частиц в каждом кадре анимации.
+            dustPaths = new PointF[dust.Length][];
+            PrepareDustPaths();
         }
 
         private static Bitmap Reduced(Bitmap original, Size requested)
@@ -621,10 +627,40 @@ namespace LP_PopovD_App
             }
         }
 
-        // Частицы не телепортируются по заранее рассчитанной кривой.
-        // От момента отделения от поля до текущего кадра их координаты
-        // численно интегрируются из ТОГО ЖЕ векторного поля, которое
-        // направляет визуальные снежные струи.
+        // Временные траектории предрассчитаны интегрированием общей
+        // модели ветра. Это НЕ индивидуальные кривые к нижним углам:
+        // положение каждой частицы определяется исключительно скоростью
+        // поля WindVelocity в точках пройденного пути.
+        private void PrepareDustPaths()
+        {
+            const int samples = 50;
+            for (int i = 0; i < dust.Length; i++)
+            {
+                SnowSeed seed = dust[i];
+                float born = .11f + seed.Phase * .60f;
+                RectangleF field = fields[i % fields.Length];
+                float startX = field.Left + seed.X * field.Width;
+                float startY = field.Top + seed.Y * field.Height;
+                bool left = startX < 800;
+                float lane = .10f + seed.Y * .80f;
+                PointF[] route = new PointF[samples];
+                PointF position = new(startX, startY);
+                route[0] = position;
+                for (int sample = 1; sample < samples; sample++)
+                {
+                    float at = born + (sample - .5f) * DustStepSeconds;
+                    PointF velocity = WindVelocity(position, at, left, lane, seed.Angle, seed.Speed);
+                    position.X += velocity.X * DustStepSeconds;
+                    position.Y += velocity.Y * DustStepSeconds;
+                    route[sample] = position;
+                }
+                dustPaths[i] = route;
+            }
+        }
+
+        // После рождения частиц их движение берётся из рассчитанного
+        // поля скорости. Поэтому они зависают до прихода ветра и затем
+        // подхватываются его порывами, а не сами летят в угол.
         private void DrawDust(Graphics g, float time)
         {
             if (time > 2.15f) return;
@@ -638,30 +674,21 @@ namespace LP_PopovD_App
                 float age = time - born;
                 if (age <= 0 || age >= 1.45f) continue;
 
-                RectangleF source = fields[i % fields.Length];
-                float startX = source.Left + seed.X * source.Width;
-                float startY = source.Top + seed.Y * source.Height;
-                bool left = startX < 800;
-                float lane = .10f + seed.Y * .80f;
-                PointF position = new(startX, startY);
-
-                float life = Math.Min(age, 1.38f);
-                int steps = Math.Max(1, (int)MathF.Ceiling(life / .038f));
-                float stepTime = life / steps;
-                for (int step = 0; step < steps; step++)
-                {
-                    float at = born + step * stepTime;
-                    PointF v = WindVelocity(position, at, left, lane, seed.Angle, seed.Speed);
-                    // Пока ветер не подошёл, частицы остаются у поверхности,
-                    // а не начинают самостоятельно двигаться в угол.
-                    position.X += v.X * stepTime;
-                    position.Y += v.Y * stepTime;
-                }
+                PointF[] route = dustPaths[i];
+                float frame = age / DustStepSeconds;
+                int index = Math.Clamp((int)frame, 0, route.Length - 2);
+                float part = Math.Clamp(frame - index, 0, 1);
+                PointF position = new(
+                    route[index].X + (route[index + 1].X - route[index].X) * part,
+                    route[index].Y + (route[index + 1].Y - route[index].Y) * part);
 
                 if (position.X < -24 || position.X > 1624 ||
                     position.Y < -24 || position.Y > 824) continue;
 
-                PointF velocityNow = WindVelocity(position, time, left, lane, seed.Angle, seed.Speed);
+                RectangleF field = fields[i % fields.Length];
+                float originX = field.Left + seed.X * field.Width;
+                PointF velocityNow = WindVelocity(position, time, originX < 800,
+                    .10f + seed.Y * .80f, seed.Angle, seed.Speed);
                 float speed = MathF.Sqrt(velocityNow.X * velocityNow.X +
                     velocityNow.Y * velocityNow.Y);
                 float strength = Math.Clamp(speed / 750f, 0, 1) *
