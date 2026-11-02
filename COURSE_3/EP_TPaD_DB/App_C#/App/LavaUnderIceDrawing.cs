@@ -103,9 +103,10 @@ namespace LP_PopovD_App
             g.PixelOffsetMode = PixelOffsetMode.None;
             float drift = (float)((seconds * 26) % Tile);
             float vertical = (float)((seconds * 6.5) % Tile);
-            for (int y = -Tile; y < 900; y += Tile)
-                for (int x = -Tile; x < 1700; x += Tile)
-                    g.DrawImage(sheet, new RectangleF(x + drift, y + vertical, Tile, Tile));
+            // TextureBrush повторяет русла без 12-16 DrawImage на каждом кадре.
+            using TextureBrush molten = new(sheet, WrapMode.Tile);
+            molten.TranslateTransform(drift, vertical);
+            g.FillPath(molten, rink);
 
             // Лёд поверх горячих трещин: приглушение света голубоватой
             // матовой плёнкой создаёт ощущение глубины, а не огня на льду.
