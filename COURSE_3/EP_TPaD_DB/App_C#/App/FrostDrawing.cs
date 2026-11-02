@@ -32,7 +32,9 @@ namespace LP_PopovD_App
             foreach (FrostHoverAnimation item in active)
             {
                 item.UpdateAmount();
-                float ambient = item.Ambient;
+                // Не будим кнопку ради скрытого инея: при полном
+                // заледенении её фоновый слой не виден.
+                float ambient = item.Ambient * (1 - item.Amount);
                 bool hovering = item.transition.IsRunning;
                 if (hovering || MathF.Abs(item.lastAmbient - ambient) >= .003f)
                 {
