@@ -11,7 +11,8 @@ namespace LP_PopovD_App
         private readonly Size size, displaySize;
         private readonly Bitmap before, clean, reducedBefore, reducedClean, overlayBuffer, letters, glow, printed;
         private readonly Graphics overlayGraphics;
-        private readonly List<(Bitmap Image, Rectangle Bounds, float Delay, float Drift, float Sway)> pieces = new();
+        private readonly List<PanelDissolve> panels = new();
+        private readonly SnowSeed[] dust = SnowDrawing.Seeds(380, 81230);
         private readonly SnowSeed[] wind = SnowDrawing.Seeds(252, 81624);
         private readonly SnowSeed[] squall = SnowDrawing.Seeds(176, 73591);
         private readonly SnowSeed[] powder = SnowDrawing.Seeds(132, 22147);
@@ -53,11 +54,11 @@ namespace LP_PopovD_App
             printed = PrintedSprite(letters, canvas);
             path.Flatten(null, .7f);
             glyphPoints = path.PathPoints;
-            foreach (RectangleF field in fields) AddPieces(field, 12);
-            AddPieces(JerseyDrawing.LoginSubmitBounds, 10);
-            AddPieces(JerseyDrawing.RememberBounds, 6);
-            AddPieces(JerseyDrawing.BackBounds, 4);
-            AddPieces(JerseyDrawing.LoginStatusBounds, 8);
+            foreach (RectangleF field in fields) AddPanel(field);
+            AddPanel(JerseyDrawing.LoginSubmitBounds);
+            AddPanel(JerseyDrawing.RememberBounds);
+            AddPanel(JerseyDrawing.BackBounds);
+            AddPanel(JerseyDrawing.LoginStatusBounds);
         }
 
         private static Bitmap Reduced(Bitmap original, Size requested)
@@ -72,30 +73,108 @@ namespace LP_PopovD_App
             return result;
         }
 
-        private void AddPieces(RectangleF sceneBounds, int columns)
+        // Маска растворения — пиксельная, с независимым шумом на каждом пикселе.
+        // Это исключает квадратные куски и сотни GDI-битмапов/DrawImage на кадр.
+        private sealed class PanelDissolve : IDisposable
+        {
+            private readonly Bitmap source, eroded;
+            private readonly int[] original, pixels;
+            private readonly byte[] thresholds;
+            private readonly Rectangle bounds;
+            private readonly float delay;
+
+            internal PanelDissolve(Bitmap background, Rectangle bounds, int seed, float delay)
+            {
+                this.bounds = bounds;
+                this.delay = delay;
+                source = background.Clone(bounds, PixelFormat.Format32bppPArgb);
+                eroded = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppPArgb);
+                eroded.SetResolution(96, 96);
+                original = new int[bounds.Width * bounds.Height];
+                pixels = new int[original.Length];
+                thresholds = new byte[original.Length];
+                Random random = new(seed);
+                int gridWidth = (bounds.Width + 5) / 6;
+                int gridHeight = (bounds.Height + 5) / 6;
+                byte[] largeScale = new byte[gridWidth * gridHeight];
+                random.NextBytes(largeScale);
+                random.NextBytes(thresholds);
+
+                // Смешиваем мелкое зерно с крупной непрерывной неоднородностью
+                // для морозной, а не клетчатой картины разрушения поверхности.
+                for (int y = 0; y < bounds.Height; y++)
+                {
+                    int row = y * bounds.Width;
+                    for (int x = 0; x < bounds.Width; x++)
+                    {
+                        int k = row + x;
+                        int coarse = largeScale[(y / 6) * gridWidth + x / 6];
+                        int variation = (int)(thresholds[k] * .78f + coarse * .22f);
+                        thresholds[k] = (byte)Math.Clamp(variation, 1, 254);
+                    }
+                }
+
+                BitmapData data = source.LockBits(
+                    new Rectangle(Point.Empty, source.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+                try
+                {
+                    for (int y = 0; y < bounds.Height; y++)
+                        Marshal.Copy(IntPtr.Add(data.Scan0, data.Stride * y), original,
+                            y * bounds.Width, bounds.Width);
+                }
+                finally { source.UnlockBits(data); }
+            }
+
+            internal void Draw(Graphics g, float seconds)
+            {
+                float age = Math.Clamp((seconds - delay) / .91f, 0, 1);
+                if (age <= 0) { g.DrawImageUnscaled(source, bounds.Location); return; }
+                if (age >= 1) return;
+                float dissolve = SnowDrawing.Smooth(age);
+
+                // Один LockBits на панель; кусочки имеют размер отдельного пикселя,
+                // а не видимого прямоугольного тайла.
+                for (int k = 0; k < original.Length; k++)
+                {
+                    float limit = thresholds[k] / 255f;
+                    float opacity = SnowDrawing.Smooth((limit - dissolve) * 11f + .5f);
+                    uint pixel = unchecked((uint)original[k]);
+                    int a = (int)(pixel >> 24);
+                    int outA = (int)(a * opacity);
+                    if (outA == 0) { pixels[k] = 0; continue; }
+                    int red = (int)((pixel >> 16 & 255) * opacity);
+                    int green = (int)((pixel >> 8 & 255) * opacity);
+                    int blue = (int)((pixel & 255) * opacity);
+                    pixels[k] = (outA << 24) | (red << 16) | (green << 8) | blue;
+                }
+                BitmapData data = eroded.LockBits(new Rectangle(Point.Empty, eroded.Size),
+                    ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+                try
+                {
+                    for (int y = 0; y < bounds.Height; y++)
+                        Marshal.Copy(pixels, y * bounds.Width,
+                            IntPtr.Add(data.Scan0, data.Stride * y), bounds.Width);
+                }
+                finally { eroded.UnlockBits(data); }
+                g.DrawImageUnscaled(eroded, bounds.Location);
+            }
+
+            public void Dispose() { source.Dispose(); eroded.Dispose(); }
+        }
+
+        private void AddPanel(RectangleF sceneBounds)
         {
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
-            float scale = canvas.Width / 1600;
-            Rectangle bounds = Rectangle.Intersect(new Rectangle(Point.Empty, size), Rectangle.Ceiling(new RectangleF(
-                canvas.X + (sceneBounds.X - 3) * scale, canvas.Y + (sceneBounds.Y - 3) * scale,
-                (sceneBounds.Width + 6) * scale, (sceneBounds.Height + 6) * scale)));
-            // Мелкие фрагменты с разными задержками и траекториями, а не исчезающие полосы.
-            const int rows = 3;
-            for (int row = 0; row < rows; row++)
-                for (int col = 0; col < columns; col++)
-                {
-                    int left = bounds.Left + bounds.Width * col / columns;
-                    int right = bounds.Left + bounds.Width * (col + 1) / columns;
-                    int top = bounds.Top + bounds.Height * row / rows;
-                    int bottom = bounds.Top + bounds.Height * (row + 1) / rows;
-                    Rectangle tile = new(left, top, right - left, bottom - top);
-                    if (tile.Width < 1 || tile.Height < 1) continue;
-                    Bitmap image = reducedBefore.Clone(tile, PixelFormat.Format32bppPArgb);
-                    uint hash = unchecked((uint)col * 2246822519u + (uint)row * 3266489917u + (uint)bounds.Left * 668265263u);
-                    float jitter = (hash & 255) / 255f;
-                    float delay = .10f + .20f * jitter + .07f * row;
-                    pieces.Add((image, tile, delay, .62f + jitter * .75f, (hash >> 8 & 255) / 255f));
-                }
+            float scale = canvas.Width / 1600f;
+            Rectangle bounds = Rectangle.Intersect(new Rectangle(Point.Empty, size),
+                Rectangle.Ceiling(new RectangleF(
+                    canvas.X + (sceneBounds.X - 3) * scale,
+                    canvas.Y + (sceneBounds.Y - 3) * scale,
+                    (sceneBounds.Width + 6) * scale, (sceneBounds.Height + 6) * scale)));
+            if (bounds.Width < 1 || bounds.Height < 1) return;
+            int seed = unchecked(bounds.X * 73856093 ^ bounds.Y * 19349663 ^ bounds.Width * 83492791);
+            panels.Add(new PanelDissolve(reducedBefore, bounds, seed,
+                .055f + .025f * panels.Count));
         }
 
         private Bitmap LetterSprite(GraphicsPath path, bool halo)
@@ -162,7 +241,7 @@ namespace LP_PopovD_App
 
         internal Bitmap Render(float milliseconds)
         {
-            Bitmap frame = new(size.Width, size.Height, PixelFormat.Format32bppPArgb);
+            Bitmap frame = new(displaySize.Width, displaySize.Height, PixelFormat.Format32bppPArgb);
             frame.SetResolution(96, 96);
             using Graphics g = Graphics.FromImage(frame);
             Draw(g, milliseconds);
@@ -194,27 +273,7 @@ namespace LP_PopovD_App
         {
             float time = Math.Clamp(milliseconds, 0, DurationMilliseconds) / 1000;
             using ImageAttributes alpha = new();
-            foreach (var piece in pieces)
-            {
-                float age = (time - piece.Delay) / (1.06f + .22f * piece.Drift);
-                if (age >= 1) continue;
-                float moved = SnowDrawing.Smooth(Math.Clamp(age, 0, 1));
-                float opacity = 1 - SnowDrawing.Smooth((age - .12f) / .74f);
-                if (opacity <= .002f) continue;
-                float side = piece.Bounds.X + piece.Bounds.Width / 2f < size.Width / 2f ? -1 : 1;
-                float reach = size.Width * (.20f + .20f * piece.Drift);
-                float dx = side * reach * moved +
-                    MathF.Sin(age * 13 + piece.Sway * MathF.Tau) * 13 * moved;
-                float dy = size.Height * (.35f + .30f * piece.Drift) * moved;
-                float scale = 1 - .38f * moved;
-                Rectangle dest = new((int)MathF.Round(piece.Bounds.X + dx),
-                    (int)MathF.Round(piece.Bounds.Y + dy),
-                    Math.Max(1, (int)MathF.Round(piece.Bounds.Width * scale)),
-                    Math.Max(1, (int)MathF.Round(piece.Bounds.Height * scale)));
-                alpha.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(opacity, 0, 1) });
-                g.DrawImage(piece.Image, dest, 0, 0, piece.Image.Width, piece.Image.Height,
-                    GraphicsUnit.Pixel, alpha);
-            }
+            foreach (PanelDissolve panel in panels) panel.Draw(g, time);
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             GraphicsState state = g.Save();
             g.TranslateTransform(canvas.X, canvas.Y);
@@ -222,6 +281,7 @@ namespace LP_PopovD_App
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBilinear;
             DrawWind(g, time);
+            DrawDust(g, time);
             float falling = Math.Clamp((time - 1.20f) / (ContactSeconds - 1.20f), 0, 1);
             float drop = falling * falling * falling;
             float sinceContact = Math.Max(0, time - ContactSeconds);
@@ -373,6 +433,41 @@ namespace LP_PopovD_App
             }
         }
 
+        // Текстура полей исчезает попиксельно, а отсоединённая микропыль
+        // подхватывается встречными потоками в два нижних угла.
+        private void DrawDust(Graphics g, float time)
+        {
+            if (time >= 1.7f) return;
+            using SolidBrush grains = new(Color.White);
+            using Pen streak = new(Color.White, 1) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            for (int i = 0; i < dust.Length; i++)
+            {
+                SnowSeed seed = dust[i];
+                float age = (time - .08f - seed.Phase * .36f) / (.70f + .28f * seed.Speed);
+                if (age <= 0 || age >= 1) continue;
+                RectangleF source = fields[i % fields.Length];
+                float fromX = source.Left + seed.X * source.Width;
+                float fromY = source.Top + seed.Y * source.Height;
+                float side = fromX < 800 ? -1 : 1;
+                float destX = side < 0 ? -45 : 1645;
+                float destY = 850 + 30 * seed.Y;
+                float phase = SnowDrawing.Smooth(age);
+                float q = 1 - phase;
+                float anchorX = fromX + side * (95 + seed.Speed * 90);
+                float anchorY = fromY - 55 - 40 * seed.Speed;
+                float x = q * q * fromX + 2 * q * phase * anchorX + phase * phase * destX;
+                float y = q * q * fromY + 2 * q * phase * anchorY + phase * phase * destY;
+                x += 11 * MathF.Sin(seed.Angle + age * 18) * MathF.Sin(MathF.PI * age);
+                y += 5 * MathF.Cos(seed.Angle + age * 12) * MathF.Sin(MathF.PI * age);
+                float vx = (destX - anchorX) * .012f;
+                float vy = (destY - anchorY) * .011f;
+                float strength = MathF.Sin(MathF.PI * age) * (.34f + seed.Speed * .50f);
+                SnowDrawing.Grain(g, grains, streak, x, y,
+                    seed.Radius * (.32f + (1 - age) * .55f),
+                    vx, vy, strength, i % 29 == 0);
+            }
+        }
+
         private void DrawLandingSnow(Graphics g, float time)
         {
             using SolidBrush brush = new(Color.White);
@@ -407,8 +502,8 @@ namespace LP_PopovD_App
             overlayGraphics.Dispose(); overlayBuffer.Dispose();
             reducedBefore.Dispose(); reducedClean.Dispose();
             before.Dispose(); clean.Dispose(); letters.Dispose(); glow.Dispose(); printed.Dispose();
-            foreach (var piece in pieces) piece.Image.Dispose();
-            pieces.Clear();
+            foreach (PanelDissolve panel in panels) panel.Dispose();
+            panels.Clear();
         }
     }
 }
