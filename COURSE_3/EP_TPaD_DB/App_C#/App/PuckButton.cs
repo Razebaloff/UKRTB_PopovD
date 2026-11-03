@@ -2,6 +2,50 @@ namespace LP_PopovD_App
 {
     public class PuckButton : RinkMenuButton
     {
+        private Bitmap? crackTexture;
+        private Size crackSize;
+
+        internal void PaintCrackedIce(Graphics background)
+        {
+            if (!Visible || HoverIceAmount <= .002f || Width < 12 || Height < 12) return;
+            if (crackTexture == null || crackSize != ClientSize)
+            {
+                crackTexture?.Dispose();
+                crackSize = ClientSize;
+                crackTexture = PuckCrackDrawing.Create(ClientSize, 1951 + Text.Length * 41);
+            }
+            PuckCrackDrawing.Draw(background, crackTexture, Bounds, HoverIceAmount);
+        }
+
+        protected override void OnFrostFrame()
+        {
+            // Трещины выходят за круглый Region кнопки, поэтому
+            // перерисовываем только окружающее её кольцо на Form1.
+            if (Parent != null && Visible)
+                Parent.Invalidate(PuckCrackDrawing.Bounds(Bounds));
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            crackTexture?.Dispose();
+            crackTexture = null;
+            crackSize = Size.Empty;
+        }
+
+        protected override void OnVisibleChanged(EventArgs e)
+        {
+            base.OnVisibleChanged(e);
+            if (Parent != null)
+                Parent.Invalidate(PuckCrackDrawing.Bounds(Bounds));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) crackTexture?.Dispose();
+            base.Dispose(disposing);
+        }
+
         public PuckButton()
         {
             Text = "ВОЙТИ";
