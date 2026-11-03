@@ -11,7 +11,10 @@ namespace LP_PopovD_App
         private Bitmap[]? iceFrames;
         private readonly FrostHoverAnimation frost;
         private FrostSpeck[]? frostSpecks;
-        protected float HoverIceAmount => frost.Amount;
+        // Заледенение при наведении оставлено только на стартовых
+        // шайбах. Круглые кнопки расписания/аренды/профиля без корки.
+        protected virtual bool UsesHoverIce => this is PuckButton;
+        protected float HoverIceAmount => UsesHoverIce ? frost.Amount : 0;
         protected virtual void OnFrostFrame() { }
         private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
@@ -94,11 +97,11 @@ namespace LP_PopovD_App
             // следующий цикл выбирает новые точки из детерминированного seed.
             frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true,
                 8491 + Text.Length * 71);
-            float ambient = frost.Ambient * (1 - frost.Amount);
+            float ambient = frost.Ambient * (UsesHoverIce ? 1 - frost.Amount : 1);
             if (ambient > .015f)
                 FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
                     FrostHoverAnimation.Seconds, ambient, true);
-            if (frost.Amount > .002f)
+            if (UsesHoverIce && frost.Amount > .002f)
             {
                 if (iceFrames == null || frostTextureSize != ClientSize)
                 {
@@ -152,7 +155,7 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
-            frost.SetTarget(true);
+            if (UsesHoverIce) frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
@@ -161,7 +164,7 @@ namespace LP_PopovD_App
         {
             hovered = false;
             pressed = false;
-            frost.SetTarget(false);
+            if (UsesHoverIce) frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
