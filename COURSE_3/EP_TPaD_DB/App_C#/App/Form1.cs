@@ -402,7 +402,9 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
-            scheduleBoard.Bounds = ToPixels(new RectangleF(110, 125, 1380, 600));
+            // Полноэкранное расписание без рамки поля и пустых полей
+            // вокруг таблицы: занимает именно клиентскую область формы.
+            scheduleBoard.Bounds = ClientRectangle;
             submitButton.Text = registration
                 ? (accounts.RegistrationCodeRequested ? "ЗАРЕГИСТРИРОВАТЬСЯ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ")
                 : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
@@ -410,8 +412,13 @@ namespace LP_PopovD_App
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
             submitButton.Bounds = ToPixels(registration ? JerseyDrawing.SubmitBounds : JerseyDrawing.LoginSubmitBounds);
-            backButton.Bounds = ToPixels(screen == AppScreen.Schedule
-                ? new RectangleF(52, 60, 174, 52) : JerseyDrawing.BackBounds);
+            backButton.Bounds = screen == AppScreen.Schedule
+                ? new Rectangle(
+                    Math.Max(12, (int)(ClientSize.Width * .03125f)),
+                    Math.Max(12, (int)(ClientSize.Height * .0578f)),
+                    Math.Max(96, (int)(ClientSize.Width * .108f)),
+                    Math.Max(36, (int)(ClientSize.Height * .0645f)))
+                : ToPixels(JerseyDrawing.BackBounds);
         }
 
         private void HideScreenControls()
@@ -430,6 +437,14 @@ namespace LP_PopovD_App
             entryButton.Visible = registrationButton.Visible = entryScheduleButton.Visible = entry;
             rentButton.Visible = profileButton.Visible = informationButton.Visible = scheduleButton.Visible = menu;
             scheduleBoard.Visible = schedule;
+            if (schedule)
+            {
+                // Полноэкранная таблица — нижний дочерний HWND.
+                // Кнопка «НАЗАД» должна оставаться над ней и
+                // получать клики, а не перекрываться сеткой.
+                scheduleBoard.SendToBack();
+                backButton.BringToFront();
+            }
             loginInput.Visible = passwordInput.Visible = submitButton.Visible = auth;
             emailInput.Visible = screen == AppScreen.Registration;
             codeInput.Visible = (screen == AppScreen.Login && loginFlow.CodeRequested) ||
@@ -554,7 +569,10 @@ namespace LP_PopovD_App
             image.SetResolution(96, 96);
             using Graphics g = Graphics.FromImage(image);
             PaintScene(g, ClientRectangle, withoutSticks);
-            foreach (Control control in Controls)
+            // Перечисляем дочерние HWND от заднего к переднему —
+            // иначе полноэкранный ScheduleBoard затрёт «НАЗАД»
+            // на снимке перехода/экспорта, хотя в реальном UI он выше.
+            foreach (Control control in Controls.Cast<Control>().Reverse())
             {
                 if (!control.Visible || control.Width < 1 || control.Height < 1 ||
                     !ClientRectangle.IntersectsWith(control.Bounds)) continue;
