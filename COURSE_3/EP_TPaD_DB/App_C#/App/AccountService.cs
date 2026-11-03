@@ -197,7 +197,15 @@ namespace LP_PopovD_App
 
         private PendingCode? pending;
         private DateTimeOffset lastSent;
-        private readonly HockeyUserDatabase database = new();
+        private readonly HockeyUserDatabase database;
+        private readonly Func<string, string, EmailCodePurpose, Task> deliver;
+
+        internal HockeyAccountService(HockeyUserDatabase? database = null,
+            Func<string, string, EmailCodePurpose, Task>? deliver = null)
+        {
+            this.database = database ?? new HockeyUserDatabase();
+            this.deliver = deliver ?? HockeyVerificationMail.SendAsync;
+        }
 
         internal bool RegistrationCodeRequested => pending?.Purpose == EmailCodePurpose.Registration;
         internal bool LoginCodeRequested => pending?.Purpose == EmailCodePurpose.Login;
@@ -237,7 +245,7 @@ namespace LP_PopovD_App
                 Iterations = credential?.Iterations ?? 0
             };
 
-            try { await HockeyVerificationMail.SendAsync(email, code, purpose); }
+            try { await deliver(email, code, purpose); }
             catch { candidate.Clear(); throw; }
 
             Reset();
