@@ -22,9 +22,13 @@ namespace LP_PopovD_App
         private readonly float spriteScale, nameScale;
         private readonly RectangleF letterBounds;
         private readonly PointF initial = new(800, 362), landed = new(800, 460);
-        private readonly RectangleF[] fields = JerseyDrawing.InputBounds(false, true);
+        private readonly RectangleF[] fields;
 
-        internal LoginSuccessDrawing(Size size, Bitmap before, Bitmap clean, string login)
+        // Единая анимация для успешного ВХОДА и завершения РЕГИСТРАЦИИ:
+        // кристаллическое рассеивание полей, снежный ветер и фамилия
+        // на майке. Отличается только набор исчезающих полей.
+        internal LoginSuccessDrawing(Size size, Bitmap before, Bitmap clean, string login,
+            bool registration = false)
         {
             displaySize = size;
             int width = Math.Min(size.Width, 960);
@@ -59,11 +63,12 @@ namespace LP_PopovD_App
             printed = PrintedSprite(letters, canvas);
             path.Flatten(null, .7f);
             glyphPoints = path.PathPoints;
+            fields = JerseyDrawing.InputBounds(registration, true);
             foreach (RectangleF field in fields) AddPanel(field);
-            AddPanel(JerseyDrawing.LoginSubmitBounds);
-            AddPanel(JerseyDrawing.RememberBounds);
+            AddPanel(registration ? JerseyDrawing.SubmitBounds : JerseyDrawing.LoginSubmitBounds);
+            if (!registration) AddPanel(JerseyDrawing.RememberBounds);
             AddPanel(JerseyDrawing.BackBounds);
-            AddPanel(JerseyDrawing.LoginStatusBounds);
+            AddPanel(registration ? JerseyDrawing.StatusBounds : JerseyDrawing.LoginStatusBounds);
             // Путь каждого зерна рассчитывается один раз, без численного
             // интегрирования сотен частиц в каждом кадре анимации.
             dustPaths = new PointF[dust.Length][];
