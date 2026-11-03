@@ -363,7 +363,8 @@ namespace LP_PopovD_App
         }
 
         internal static void DrawSpecks(Graphics g, Rectangle bounds,
-            FrostSpeck[] specks, float seconds, float intensity, bool round)
+            FrostSpeck[] specks, float seconds, float intensity, bool round,
+            bool protectCaption = false)
         {
             if (bounds.Width < 5 || bounds.Height < 5 || intensity < .015f) return;
             GraphicsState state = g.Save();
@@ -416,7 +417,22 @@ namespace LP_PopovD_App
 
                 // Овальные кнопки намного ниже шайб: масштабируем
                 // прожилки по высоте капсулы, а не по её площади.
-                float span = round ? diameter * speck.Size : diameter * speck.Size;
+                if (protectCaption)
+                {
+                    // Не вырезаем прямоугольник. На первичной кнопке
+                    // прожилки плавно теряют яркость по мере приближения
+                    // к центральной надписи — без видимой границы маски.
+                    float dx = MathF.Abs(x - .5f);
+                    float dy = MathF.Abs(y - .5f);
+                    float horizontal = SnowDrawing.Smooth(Math.Clamp((dx - .28f) / .15f, 0, 1));
+                    float vertical = SnowDrawing.Smooth(Math.Clamp((dy - .12f) / .24f, 0, 1));
+                    float visibility = 1 - (1 - horizontal) * (1 - vertical);
+                    int adjusted = (int)(strength * visibility * OpacityStages);
+                    if (adjusted <= 0) continue;
+                    opacityStep = Math.Clamp(adjusted, 0, OpacityStages - 1);
+                }
+
+                float span = diameter * speck.Size;
                 float cx = bounds.Left + x * bounds.Width;
                 float cy = bounds.Top + y * bounds.Height;
                 Bitmap filament = GetFilamentSprite(speck.Variant, growthStep, opacityStep);
