@@ -13,6 +13,7 @@ namespace LP_PopovD_App
         private static readonly System.Windows.Forms.Timer sharedTimer = CreateTimer();
         private readonly Stopwatch transition = new();
         private readonly Action invalidate;
+        private readonly float transitionMilliseconds;
         private float from, target;
         private bool visible, disposed;
         private int lastAmbientFrame = -1;
@@ -50,7 +51,11 @@ namespace LP_PopovD_App
         // не заставляет всю поверхность замерзать и таять одновременно.
         internal float Ambient => visible ? 1f : 0f;
 
-        internal FrostHoverAnimation(Action invalidate) => this.invalidate = invalidate;
+        internal FrostHoverAnimation(Action invalidate, int hoverDurationMilliseconds = 285)
+        {
+            this.invalidate = invalidate;
+            transitionMilliseconds = Math.Max(180, hoverDurationMilliseconds);
+        }
 
         internal void SetVisible(bool value)
         {
@@ -86,7 +91,8 @@ namespace LP_PopovD_App
         private void UpdateAmount()
         {
             if (!transition.IsRunning) return;
-            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 285f), 0, 1);
+            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds /
+                transitionMilliseconds), 0, 1);
             Amount = from + (target - from) * SnowDrawing.Smooth(p);
             if (p >= 1)
             {
@@ -370,15 +376,22 @@ namespace LP_PopovD_App
             for (int i = 0; i < specks.Length; i++)
             {
                 FrostSpeck speck = specks[i];
-                float cycles = (seconds - speck.Phase) / SpeckCycle;
+                // На шайбах морозные прожилки растут и тают медленнее,
+                // чем на небольших овальных кнопках входа.
+                float speedFactor = round ? 1.65f : 1f;
+                float period = SpeckCycle * speedFactor;
+                float cycles = (seconds - speck.Phase * speedFactor) / period;
                 int generation = (int)MathF.Floor(cycles);
-                float age = (cycles - generation) * SpeckCycle;
-                float total = speck.Grow + speck.Hold + speck.Melt;
+                float age = (cycles - generation) * period;
+                float growTime = speck.Grow * speedFactor;
+                float holdTime = speck.Hold * speedFactor;
+                float meltTime = speck.Melt * speedFactor;
+                float total = growTime + holdTime + meltTime;
                 if (age > total) continue;
 
-                float growth = SnowDrawing.Smooth(Math.Clamp(age / speck.Grow, 0, 1));
-                float fade = age < speck.Grow + speck.Hold ? 1 :
-                    1 - SnowDrawing.Smooth((age - speck.Grow - speck.Hold) / speck.Melt);
+                float growth = SnowDrawing.Smooth(Math.Clamp(age / growTime, 0, 1));
+                float fade = age < growTime + holdTime ? 1 :
+                    1 - SnowDrawing.Smooth((age - growTime - holdTime) / meltTime);
                 float strength = fade * speck.Opacity * intensity;
                 if (strength < .07f) continue;
                 int growthStep = Math.Clamp((int)(growth * GrowthStages), 0, GrowthStages - 1);
