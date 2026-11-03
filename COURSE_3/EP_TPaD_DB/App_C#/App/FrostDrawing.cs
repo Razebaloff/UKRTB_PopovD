@@ -439,7 +439,7 @@ namespace LP_PopovD_App
                 Bitmap layer = new(size.Width, size.Height, PixelFormat.Format32bppPArgb);
                 layer.SetResolution(96, 96);
                 frames[frame] = layer;
-                if (frame == 0) continue;
+                if (frame == 0 || size.Width < 5 || size.Height < 5) continue;
                 using Graphics g = Graphics.FromImage(layer);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 // Каждый промежуточный кадр обязан сохранять альфа-маску
@@ -481,7 +481,8 @@ namespace LP_PopovD_App
         internal static void DrawIceGrowth(Graphics g, Bitmap[] stages, Rectangle bounds,
             float amount, bool round)
         {
-            if (amount <= .001f || stages.Length < 2) return;
+            if (amount <= .001f || stages.Length < 2 ||
+                bounds.Width < 5 || bounds.Height < 5) return;
             GraphicsState original = g.Save();
             // Гарантия, что ни один растровый кадр не закрашивает углы
             // ограничивающего прямоугольника кнопки.
