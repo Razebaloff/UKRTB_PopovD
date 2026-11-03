@@ -75,7 +75,8 @@ namespace LP_PopovD_App
             codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 128) { TabIndex = 2 };
             rememberCheck = new RememberCheckBox { TabIndex = 3 };
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
-            backButton = new CapsuleButton { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
+            backButton = new CapsuleButton(specialHoverIce: true)
+            { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
             foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
             {
                 control.Visible = false;
@@ -427,9 +428,9 @@ namespace LP_PopovD_App
 
             foreach (Control control in Controls)
             {
-                control.TabStop = control.Visible;
-                // Внешний UserControl не должен перехватывать Tab
-                // вместо вложенного TextBox; он направляет фокус внутрь.
+                // CapsuleInput — это контейнер. Остановка по Tab
+                // требуется только на его вложенном TextBox.
+                control.TabStop = control.Visible && control is not CapsuleInput;
             }
         }
 
