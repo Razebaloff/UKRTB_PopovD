@@ -97,7 +97,7 @@ namespace LP_PopovD_App
                 using Font subtitle = new("Segoe UI", 17, FontStyle.Regular, GraphicsUnit.Pixel);
                 using Font weekFont = new("Segoe UI", 20, FontStyle.Bold, GraphicsUnit.Pixel);
                 using Font heading = new("Segoe UI", 16.5f, FontStyle.Bold, GraphicsUnit.Pixel);
-                using Font rowFont = new("Segoe UI", 17.5f, FontStyle.SemiBold, GraphicsUnit.Pixel);
+                using Font rowFont = new("Segoe UI", 17.5f, FontStyle.Bold, GraphicsUnit.Pixel);
                 using Font dashFont = new("Segoe UI", 18, FontStyle.Regular, GraphicsUnit.Pixel);
                 using SolidBrush white = new(Color.FromArgb(249, 253, 255));
                 using SolidBrush pale = new(Color.FromArgb(182, 220, 240));
