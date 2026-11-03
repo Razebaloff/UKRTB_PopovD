@@ -10,6 +10,23 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
+        private readonly bool crackOnHover;
+        private Bitmap? crackLayer;
+        private Size crackSize;
+        internal float CrackAmount => crackOnHover ? frost.Amount : 0;
+
+        internal void PaintCrackedIce(Graphics background)
+        {
+            if (!crackOnHover || !Visible || CrackAmount < .003f ||
+                Width < 10 || Height < 10) return;
+            if (crackLayer == null || crackSize != ClientSize)
+            {
+                crackLayer?.Dispose();
+                crackSize = ClientSize;
+                crackLayer = CapsuleCrackDrawing.Create(ClientSize, 8171);
+            }
+            CapsuleCrackDrawing.Draw(background, crackLayer, Bounds, CrackAmount);
+        }
         private FrostSpeck[]? frostSpecks;
         private Bitmap? captionLayer;
         private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
@@ -17,8 +34,9 @@ namespace LP_PopovD_App
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
 
-        internal CapsuleButton()
+        internal CapsuleButton(bool crackOnHover = false)
         {
+            this.crackOnHover = crackOnHover;
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
@@ -26,8 +44,13 @@ namespace LP_PopovD_App
             Cursor = Cursors.Hand;
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
-            frost = new FrostHoverAnimation(
-                () => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost = new FrostHoverAnimation(() =>
+            {
+                if (IsDisposed || !IsHandleCreated) return;
+                Invalidate();
+                if (crackOnHover && Parent != null && Visible)
+                    Parent.Invalidate(CapsuleCrackDrawing.Bounds(Bounds));
+            }, crackOnHover ? 900 : 285);
             frost.SetVisible(Visible);
         }
         internal void SetScale(float scale)
@@ -44,6 +67,9 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostSpecks = null;
+            crackLayer?.Dispose();
+            crackLayer = null;
+            crackSize = Size.Empty;
             captionLayer?.Dispose();
             captionLayer = null;
         }
@@ -118,12 +144,14 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
+            if (crackOnHover) frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
         protected override void OnMouseLeave(EventArgs e)
         {
             hovered = pressed = false;
+            if (crackOnHover) frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -136,6 +164,7 @@ namespace LP_PopovD_App
             if (disposing)
             {
                 frost?.Dispose();
+                crackLayer?.Dispose();
                 captionLayer?.Dispose();
                 labelFont?.Dispose();
             }
