@@ -75,7 +75,7 @@ namespace LP_PopovD_App
             codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 128) { TabIndex = 2 };
             rememberCheck = new RememberCheckBox { TabIndex = 3 };
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
-            backButton = new CapsuleButton(specialHoverIce: true)
+            backButton = new CapsuleButton
             { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
             foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
             {
@@ -432,6 +432,58 @@ namespace LP_PopovD_App
                 // требуется только на его вложенном TextBox.
                 control.TabStop = control.Visible && control is not CapsuleInput;
             }
+        }
+
+        // Единственный порядок клавиатурной навигации на экране.
+        // Контейнеры CapsuleInput не имеют TabStop, но фокус
+        // непосредственно устанавливается на вложенный TextBox.
+        private Control[] CurrentTabOrder() => screen switch
+        {
+            AppScreen.Entry => new Control[]
+                { entryButton, registrationButton, entryScheduleButton },
+            AppScreen.Menu => new Control[]
+                { rentButton, profileButton, informationButton, scheduleButton, backButton },
+            AppScreen.Registration => new Control[]
+                { loginInput, passwordInput, emailInput, submitButton, backButton },
+            AppScreen.Login when loginFlow.CodeRequested => new Control[]
+                { loginInput, passwordInput, codeInput, rememberCheck, submitButton, backButton },
+            _ => new Control[]
+                { loginInput, passwordInput, rememberCheck, submitButton, backButton }
+        };
+
+        internal bool MoveFocusByTab(bool backwards)
+        {
+            if (Busy || IsDisposed || Disposing) return false;
+            Control[] elements = CurrentTabOrder()
+                .Where(control => control.Visible && control.Enabled && control.IsHandleCreated)
+                .ToArray();
+            if (elements.Length == 0) return false;
+
+            int index = Array.FindIndex(elements, control =>
+                control.Focused || control.ContainsFocus);
+            // Индекс -1: к первому (Shift+Tab — к последнему).
+            int start = index < 0 ? (backwards ? 0 : -1) : index;
+            for (int step = 1; step <= elements.Length; step++)
+            {
+                int next = (start + (backwards ? -step : step) + elements.Length * 2)
+                    % elements.Length;
+                Control candidate = elements[next];
+                if (candidate is CapsuleInput field)
+                    field.FocusInput();
+                else
+                    candidate.Focus();
+                if (candidate.ContainsFocus || candidate.Focused) return true;
+            }
+            return false;
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if ((keyData & Keys.KeyCode) == Keys.Tab &&
+                (keyData & ~(Keys.KeyCode | Keys.Shift)) == Keys.None &&
+                MoveFocusByTab((keyData & Keys.Shift) != 0))
+                return true;
+            return base.ProcessDialogKey(keyData);
         }
 
         private Bitmap CaptureScreen(bool withoutSticks = false)
