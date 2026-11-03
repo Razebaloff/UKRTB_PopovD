@@ -94,6 +94,13 @@ namespace LP_PopovD_App
                 case AppScreen.Registration:
                     JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks, codeRequested, authPanels);
                     break;
+                case AppScreen.Schedule:
+                    // Общая ледовая арена остаётся фоном; недельная таблица
+                    // размещается поверх как интерактивный ScheduleBoard.
+                    RinkDrawing.Draw(g);
+                    if (includeControls)
+                        JerseyDrawing.DrawCapsule(g, JerseyDrawing.BackBounds, "НАЗАД", false);
+                    break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);
                     if (includeControls)
