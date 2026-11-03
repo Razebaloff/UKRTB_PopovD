@@ -88,6 +88,19 @@ namespace LP_PopovD_App
             // каретка и ввод не теряются за оболочкой UserControl.
             if (!input.Focused && input.CanFocus) input.Focus();
         }
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            // Вложенный TextBox — самостоятельное окно Win32.
+            // Явно передаём Tab / Shift+Tab форме, иначе UserControl
+            // способен завершить обход раньше остальных полей.
+            if ((keyData & Keys.KeyCode) == Keys.Tab &&
+                (keyData & ~(Keys.KeyCode | Keys.Shift)) == Keys.None &&
+                Parent is Form1 form &&
+                form.MoveFocusByTab((keyData & Keys.Shift) != 0))
+                return true;
+            return base.ProcessDialogKey(keyData);
+        }
+
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); input.Focus(); }
         protected override void OnPaintBackground(PaintEventArgs e)
         {
