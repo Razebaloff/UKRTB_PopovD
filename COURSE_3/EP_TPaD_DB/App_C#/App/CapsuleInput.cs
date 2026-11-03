@@ -27,7 +27,7 @@ namespace LP_PopovD_App
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            TabStop = false;
+            TabStop = true;
             Cursor = Cursors.IBeam;
             AccessibleName = name;
             input.BorderStyle = BorderStyle.None;
@@ -38,6 +38,8 @@ namespace LP_PopovD_App
             input.MaxLength = maxLength;
             input.AccessibleName = name;
             input.TabIndex = 0;
+            input.TabStop = true;
+            input.AcceptsTab = false;
             if (password) input.ImeMode = ImeMode.Disable;
             cue.Text = placeholder;
             cue.TextAlign = ContentAlignment.MiddleCenter;
@@ -91,6 +93,13 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutInput(); }
         protected override void OnLocationChanged(EventArgs e) { ClearFabricBrush(); base.OnLocationChanged(e); }
         protected override void OnParentChanged(EventArgs e) { ClearFabricBrush(); base.OnParentChanged(e); }
+        protected override void OnEnter(EventArgs e)
+        {
+            base.OnEnter(e);
+            // Tab попадает внутрь CapsuleInput к настоящему TextBox;
+            // каретка и ввод не теряются за оболочкой UserControl.
+            if (!input.Focused && input.CanFocus) input.Focus();
+        }
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); input.Focus(); }
         protected override void OnPaintBackground(PaintEventArgs e)
         {
