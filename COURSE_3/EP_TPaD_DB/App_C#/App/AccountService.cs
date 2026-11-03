@@ -280,6 +280,18 @@ namespace LP_PopovD_App
             await SendCodeAsync(EmailCodePurpose.Registration, login, email, credential);
         }
 
+        // Временный сценарий входа из прототипа: пользователь может
+        // ввести произвольный логин и пароль. База при этом НЕ меняется,
+        // реальные регистрации по-прежнему записываются только в SQLite.
+        internal Task RequestDemoLoginAsync(string login)
+        {
+            if (!demoCodeMode)
+                throw new InvalidOperationException("Демонстрационный вход отключён.");
+            if (string.IsNullOrWhiteSpace(login))
+                throw new InvalidOperationException("Введите логин.");
+            return SendCodeAsync(EmailCodePurpose.Login, login.Trim(), "");
+        }
+
         internal async Task RequestLoginAsync(string login, string password)
         {
             string? email = await database.VerifyLoginAsync(login, password);
