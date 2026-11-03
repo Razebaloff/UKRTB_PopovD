@@ -11,7 +11,8 @@ namespace LP_PopovD_App
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
         private FrostSpeck[]? frostSpecks;
-        private Bitmap? frostTexture, iceTexture, captionLayer;
+        private Bitmap? frostTexture, captionLayer;
+        private Bitmap[]? iceFrames;
         private Size frostTextureSize;
         private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
         [DefaultValue(false)]
@@ -44,8 +45,10 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostTexture?.Dispose();
-            iceTexture?.Dispose();
-            frostTexture = iceTexture = null;
+            frostTexture = null;
+            if (iceFrames != null)
+                foreach (Bitmap stage in iceFrames) stage.Dispose();
+            iceFrames = null;
             frostTextureSize = Size.Empty;
             frostSpecks = null;
             captionLayer?.Dispose();
@@ -87,15 +90,17 @@ namespace LP_PopovD_App
                     FrostHoverAnimation.Seconds, ambient, false);
             if (frost.Amount > .002f)
             {
-                if (iceTexture == null || frostTextureSize != ClientSize)
+                if (iceFrames == null || frostTextureSize != ClientSize)
                 {
                     frostTexture?.Dispose();
-                    iceTexture?.Dispose();
+                    if (iceFrames != null)
+                        foreach (Bitmap stage in iceFrames) stage.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
-                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, false);
+                    using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, false);
+                    iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, false);
                 }
-                FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount);
             }
             var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
             if (captionLayer == null || captionKey != labelKey)
@@ -125,6 +130,12 @@ namespace LP_PopovD_App
                 captionKey = labelKey;
             }
             g.DrawImageUnscaled(captionLayer, 0, 0);
+            if (Focused)
+            {
+                using Pen focusRing = new(Color.FromArgb(205, 240, 252, 255), 1.4f)
+                    { DashStyle = DashStyle.Dash };
+                g.DrawPath(focusRing, shape);
+            }
         }
         protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
@@ -138,7 +149,8 @@ namespace LP_PopovD_App
             {
                 frost?.Dispose();
                 frostTexture?.Dispose();
-                iceTexture?.Dispose();
+                if (iceFrames != null)
+                    foreach (Bitmap stage in iceFrames) stage.Dispose();
                 captionLayer?.Dispose();
                 labelFont?.Dispose();
             }
