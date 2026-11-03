@@ -7,14 +7,14 @@ namespace LP_PopovD_App
 
         internal void PaintCrackedIce(Graphics background)
         {
-            if (!Visible || HoverIceAmount <= .002f || Width < 12 || Height < 12) return;
+            if (!Visible || HoverCrackAmount <= .002f || Width < 12 || Height < 12) return;
             if (crackTexture == null || crackSize != ClientSize)
             {
                 crackTexture?.Dispose();
                 crackSize = ClientSize;
                 crackTexture = PuckCrackDrawing.Create(ClientSize, 1951 + Text.Length * 41);
             }
-            PuckCrackDrawing.Draw(background, crackTexture, Bounds, HoverIceAmount);
+            PuckCrackDrawing.Draw(background, crackTexture, Bounds, HoverCrackAmount);
         }
 
         protected override void OnFrostFrame()
