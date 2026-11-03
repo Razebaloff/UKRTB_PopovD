@@ -10,6 +10,7 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
+        private readonly bool specialHoverIce;
         private FrostSpeck[]? frostSpecks;
         private Bitmap? frostTexture, captionLayer;
         private Bitmap[]? iceFrames;
@@ -19,8 +20,9 @@ namespace LP_PopovD_App
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
 
-        internal CapsuleButton()
+        internal CapsuleButton(bool specialHoverIce = false)
         {
+            this.specialHoverIce = specialHoverIce;
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
@@ -28,7 +30,9 @@ namespace LP_PopovD_App
             Cursor = Cursors.Hand;
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
-            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost = new FrostHoverAnimation(
+                () => { if (!IsDisposed && IsHandleCreated) Invalidate(); },
+                specialHoverIce ? 900 : 285);
             frost.SetVisible(Visible);
         }
         internal void SetScale(float scale)
@@ -84,11 +88,26 @@ namespace LP_PopovD_App
             // затем поверх него остаётся хорошо читаемая надпись.
             frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, false,
                 3751 + Text.Length * 109);
-            float ambient = frost.Ambient * (1 - frost.Amount);
+            float ambient = frost.Ambient * (specialHoverIce ? 1 - frost.Amount : 1);
             if (ambient > .015f)
+            {
+                GraphicsState beforeFrost = g.Save();
+                if (Primary)
+                {
+                    // Морозные прожилки на кнопке отправки кода не должны
+                    // пересекать центральную зону надписи: над текстом
+                    // никогда не возникает второе светлое изображение.
+                    int guardHeight = Math.Min(Height - 4,
+                        Math.Max(18, (int)(Height * .47f)));
+                    int side = Math.Max(9, (int)(Width * .07f));
+                    g.ExcludeClip(new Rectangle(side, (Height - guardHeight) / 2,
+                        Math.Max(1, Width - 2 * side), guardHeight));
+                }
                 FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
                     FrostHoverAnimation.Seconds, ambient, false);
-            if (frost.Amount > .002f)
+                g.Restore(beforeFrost);
+            }
+            if (specialHoverIce && frost.Amount > .002f)
             {
                 if (iceFrames == null || frostTextureSize != ClientSize)
                 {
@@ -133,8 +152,20 @@ namespace LP_PopovD_App
             // Фокус выделяется небольшим изменением цвета самой кнопки.
             // Отдельная белая контурная линия не создаётся.
         }
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            hovered = true;
+            if (specialHoverIce) frost.SetTarget(true);
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            hovered = pressed = false;
+            if (specialHoverIce) frost.SetTarget(false);
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = e.Button == MouseButtons.Left; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
