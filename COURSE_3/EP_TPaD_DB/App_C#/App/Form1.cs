@@ -455,7 +455,7 @@ namespace LP_PopovD_App
         {
             if (Busy || IsDisposed || Disposing) return false;
             Control[] elements = CurrentTabOrder()
-                .Where(control => control.Visible && control.Enabled && control.IsHandleCreated)
+                .Where(control => control.Visible && control.Enabled)
                 .ToArray();
             if (elements.Length == 0) return false;
 
