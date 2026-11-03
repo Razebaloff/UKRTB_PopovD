@@ -119,6 +119,20 @@ try
     Check(!demoLogin.LoginCodeRequested && unexpectedDeliveries == 0,
         "Any nonblank demo code finishes login without SMTP");
 
+    // Старый режим входа из макета: произвольный логин, пароль и
+    // формальный код. Регистрация с SQLite при этом остаётся настоящей.
+    HockeyAccountService guestLogin = new(db, NoMail);
+    Check(await db.VerifyLoginAsync("RandomGuest", "any-pass") == null,
+        "Произвольный логин отсутствует в базе до демонстрационного входа");
+    await guestLogin.RequestDemoLoginAsync("RandomGuest");
+    Check(guestLogin.LoginCodeRequested && unexpectedDeliveries == 0,
+        "Временный вход открывает поле кода без обращения к SMTP");
+    guestLogin.CompleteLogin("буквы-и-цифры 123");
+    Check(!guestLogin.LoginCodeRequested && unexpectedDeliveries == 0,
+        "Произвольный код завершает демонстрационный вход");
+    Check(await db.VerifyLoginAsync("RandomGuest", "any-pass") == null,
+        "Демонстрационный вход не создаёт фальшивую запись в базе");
+
     Console.WriteLine($"Passed: {tests} SQLite and OTP checks.");
 }
 finally
