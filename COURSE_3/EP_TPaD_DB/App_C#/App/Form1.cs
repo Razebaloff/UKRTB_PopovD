@@ -27,6 +27,8 @@ namespace LP_PopovD_App
         private readonly CapsuleInput loginInput, passwordInput, emailInput, codeInput;
         private readonly RememberCheckBox rememberCheck;
         private readonly CapsuleButton submitButton, backButton;
+        private readonly ScheduleBoard scheduleBoard;
+        private AppScreen scheduleReturnScreen = AppScreen.Entry;
         private string authStatus = "", rememberedLogin = "", successLogin = "";
         private bool successRemember, successFromRegistration;
         private string? authenticatedLogin;
@@ -84,6 +86,8 @@ namespace LP_PopovD_App
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
             backButton = new CapsuleButton(crackOnHover: true)
             { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
+            scheduleBoard = new ScheduleBoard { TabIndex = 0 };
+            Controls.Add(scheduleBoard);
             foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
             {
                 control.Visible = false;
@@ -249,7 +253,8 @@ namespace LP_PopovD_App
             {
                 AppScreen? target = button == entryButton ? AppScreen.Login :
                     button == registrationButton ? AppScreen.Registration :
-                    button == entryScheduleButton ? AppScreen.Menu : button == backButton ? AppScreen.Entry : null;
+                    button == entryScheduleButton || button == scheduleButton ? AppScreen.Schedule :
+                    button == backButton ? (screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry) : null;
                 if (target.HasValue) await cache.GetAsync(new(target.Value));
                 if (button == submitButton && screen == AppScreen.Login)
                 {
@@ -277,7 +282,7 @@ namespace LP_PopovD_App
                 // стирание поверх готового снимка создавало видимый квадрат.
                 stickBackdrop = CaptureScreen(withoutSticks: true);
                 Action action = () => { };
-                if (target.HasValue) action = () => _ = NavigateAsync(target.Value, Center(button), button == entryScheduleButton);
+                if (target.HasValue) action = () => _ = NavigateAsync(target.Value, Center(button));
                 else if (button == submitButton) action = () => _ = SubmitAuthAsync();
                 feedbackSource = button;
                 HideScreenControls();
@@ -397,6 +402,7 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
+            scheduleBoard.Bounds = ToPixels(new RectangleF(110, 125, 1380, 600));
             submitButton.Text = registration
                 ? (accounts.RegistrationCodeRequested ? "ЗАРЕГИСТРИРОВАТЬСЯ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ")
                 : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
@@ -404,7 +410,8 @@ namespace LP_PopovD_App
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
             submitButton.Bounds = ToPixels(registration ? JerseyDrawing.SubmitBounds : JerseyDrawing.LoginSubmitBounds);
-            backButton.Bounds = ToPixels(JerseyDrawing.BackBounds);
+            backButton.Bounds = ToPixels(screen == AppScreen.Schedule
+                ? new RectangleF(52, 60, 174, 52) : JerseyDrawing.BackBounds);
         }
 
         private void HideScreenControls()
@@ -418,9 +425,11 @@ namespace LP_PopovD_App
             if (!forCapture && (loading || stickAnimation.Active || transitionFrom != null || loginSuccess != null))
             { HideScreenControls(); return; }
             bool entry = screen == AppScreen.Entry, menu = screen == AppScreen.Menu;
+            bool schedule = screen == AppScreen.Schedule;
             bool auth = screen is AppScreen.Login or AppScreen.Registration;
             entryButton.Visible = registrationButton.Visible = entryScheduleButton.Visible = entry;
             rentButton.Visible = profileButton.Visible = informationButton.Visible = scheduleButton.Visible = menu;
+            scheduleBoard.Visible = schedule;
             loginInput.Visible = passwordInput.Visible = submitButton.Visible = auth;
             emailInput.Visible = screen == AppScreen.Registration;
             codeInput.Visible = (screen == AppScreen.Login && loginFlow.CodeRequested) ||
@@ -450,6 +459,11 @@ namespace LP_PopovD_App
                 informationButton.TabIndex = 2;
                 scheduleButton.TabIndex = 3;
                 backButton.TabIndex = 4;
+            }
+            else if (screen == AppScreen.Schedule)
+            {
+                scheduleBoard.TabIndex = 0;
+                backButton.TabIndex = 1;
             }
             else
             {
@@ -484,6 +498,8 @@ namespace LP_PopovD_App
                 { entryButton, registrationButton, entryScheduleButton },
             AppScreen.Menu => new Control[]
                 { rentButton, profileButton, informationButton, scheduleButton, backButton },
+            AppScreen.Schedule => new Control[]
+                { scheduleBoard, backButton },
             AppScreen.Registration when accounts.RegistrationCodeRequested => new Control[]
                 { loginInput, passwordInput, emailInput, codeInput, submitButton, backButton },
             AppScreen.Registration => new Control[]
@@ -598,6 +614,8 @@ namespace LP_PopovD_App
                 loginFlow.Reset();
                 accounts.Reset();
                 authStatus = "";
+                if (target == AppScreen.Schedule && screen != AppScreen.Schedule)
+                    scheduleReturnScreen = screen;
                 screen = target;
                 if (target == AppScreen.Entry)
                     authenticatedLogin = null;
@@ -636,6 +654,7 @@ namespace LP_PopovD_App
             ShowScreenControls();
             if (screen == AppScreen.Entry) entryButton.Focus();
             else if (screen == AppScreen.Menu) { if (scheduleFocus) scheduleButton.Focus(); else rentButton.Focus(); }
+            else if (screen == AppScreen.Schedule) scheduleBoard.Focus();
             else if (focusCodeAfterTransition) { codeInput.FocusInput(); focusCodeAfterTransition = false; }
             else if (screen is AppScreen.Login or AppScreen.Registration) loginInput.FocusInput();
             else backButton.Focus();
@@ -759,7 +778,12 @@ namespace LP_PopovD_App
                     // Нельзя войти по произвольному логину/паролю.
                     // Идентификационные данные сверяются с SQLite,
                     // а поле кода в деморежиме принимает любое непустое значение.
-                    await accounts.RequestLoginAsync(loginInput.Value.Trim(), passwordInput.Value);
+                    // Деморежим входа: принимаем любые непустые логин и
+                    // пароль, даже если их нет в базе пользователей.
+                    if (HockeyAccountService.DemoVerificationEnabled)
+                        await accounts.RequestDemoLoginAsync(loginInput.Value.Trim());
+                    else
+                        await accounts.RequestLoginAsync(loginInput.Value.Trim(), passwordInput.Value);
                     Bitmap before = CaptureScreen();
                     loginFlow.RequestCode();
                     authStatus = "Демо: письмо не отправляется. Введите любой код.";
@@ -959,7 +983,9 @@ namespace LP_PopovD_App
                     else { CancelLoginAnimation(); ShowScreenControls(); codeInput.FocusInput(); Invalidate(true); }
                 }
                 else if (transitionFrom != null) FinishTransition();
-                else if (screen != AppScreen.Entry) _ = NavigateAsync(AppScreen.Entry, Center(backButton));
+                else if (screen != AppScreen.Entry)
+                    _ = NavigateAsync(screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry,
+                        Center(backButton));
                 else Close();
                 e.Handled = e.SuppressKeyPress = true;
             }
