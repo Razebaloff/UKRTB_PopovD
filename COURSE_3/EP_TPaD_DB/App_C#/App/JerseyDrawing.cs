@@ -15,8 +15,8 @@ namespace LP_PopovD_App
 
         internal static RectangleF[] InputBounds(bool registration, bool codeRequested = false) => registration
             ? codeRequested
-                ? new[] { new RectangleF(560, 286, 480, 56), new RectangleF(560, 360, 480, 56),
-                    new RectangleF(560, 434, 480, 56), new RectangleF(560, 508, 480, 56) }
+                ? new[] { new RectangleF(560, 302, 480, 52), new RectangleF(560, 369, 480, 52),
+                    new RectangleF(560, 436, 480, 52), new RectangleF(560, 503, 480, 52) }
                 : new[] { new RectangleF(560, 310, 480, 64), new RectangleF(560, 406, 480, 64),
                     new RectangleF(560, 502, 480, 64) }
             : codeRequested
