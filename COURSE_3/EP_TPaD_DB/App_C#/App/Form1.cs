@@ -20,6 +20,7 @@ namespace LP_PopovD_App
         private readonly System.Windows.Forms.Timer transitionTimer, stickTimer, successTimer;
         private readonly StickAnimationState stickAnimation = new();
         private readonly LoginFlowState loginFlow = new();
+        private readonly HockeyAccountService accounts = new();
         private readonly RememberedLoginStore preferences = new();
         private LoginSuccessDrawing? loginSuccess;
         private Button? feedbackSource;
@@ -30,7 +31,9 @@ namespace LP_PopovD_App
         private bool successRemember;
 
         private bool Busy => loading || preparingAction || stickAnimation.Active || transitionFrom != null || loginSuccess != null;
-        private SceneSurfaceKey CurrentKey => new(screen, screen == AppScreen.Login && loginFlow.CodeRequested);
+        private SceneSurfaceKey CurrentKey => new(screen,
+            screen == AppScreen.Login ? loginFlow.CodeRequested :
+            screen == AppScreen.Registration && accounts.RegistrationCodeRequested);
 
         public Form1()
         {
@@ -86,7 +89,7 @@ namespace LP_PopovD_App
                 if (control is Button button) button.Click += HandleAnimatedButtonClick;
             loginInput.ValueChanged += CredentialsChanged;
             passwordInput.ValueChanged += CredentialsChanged;
-            emailInput.ValueChanged += ClearStatus;
+            emailInput.ValueChanged += CredentialsChanged;
             codeInput.ValueChanged += ClearStatus;
             rememberedLogin = preferences.Load();
             rememberCheck.CheckedChanged += async (_, _) =>
@@ -350,8 +353,11 @@ namespace LP_PopovD_App
                 menu[i].Bounds = ToPixels(new RectangleF(center.X - d / 2, center.Y - d / 2, d, d));
             }
             bool registration = screen == AppScreen.Registration;
-            RectangleF[] fields = JerseyDrawing.InputBounds(registration, loginFlow.CodeRequested);
-            CapsuleInput[] inputs = registration ? new[] { loginInput, passwordInput, emailInput } : new[] { loginInput, passwordInput, codeInput };
+            bool codeRequested = registration ? accounts.RegistrationCodeRequested : loginFlow.CodeRequested;
+            RectangleF[] fields = JerseyDrawing.InputBounds(registration, codeRequested);
+            CapsuleInput[] inputs = registration
+                ? new[] { loginInput, passwordInput, emailInput, codeInput }
+                : new[] { loginInput, passwordInput, codeInput };
             float scale = RinkDrawing.GetCanvasBounds(ClientSize).Width / RinkDrawing.Width;
             for (int i = 0; i < inputs.Length; i++)
             {
@@ -362,7 +368,9 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
-            submitButton.Text = registration ? "ЗАРЕГИСТРИРОВАТЬСЯ" : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
+            submitButton.Text = registration
+                ? (accounts.RegistrationCodeRequested ? "ЗАРЕГИСТРИРОВАТЬСЯ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ")
+                : loginFlow.CodeRequested ? "ВОЙТИ" : "ПРИСЛАТЬ КОД НА ЭЛ. ПОЧТУ";
             submitButton.AccessibleName = submitButton.Text;
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
@@ -386,7 +394,8 @@ namespace LP_PopovD_App
             rentButton.Visible = profileButton.Visible = informationButton.Visible = scheduleButton.Visible = menu;
             loginInput.Visible = passwordInput.Visible = submitButton.Visible = auth;
             emailInput.Visible = screen == AppScreen.Registration;
-            codeInput.Visible = screen == AppScreen.Login && loginFlow.CodeRequested;
+            codeInput.Visible = (screen == AppScreen.Login && loginFlow.CodeRequested) ||
+                (screen == AppScreen.Registration && accounts.RegistrationCodeRequested);
             rememberCheck.Visible = screen == AppScreen.Login;
             backButton.Visible = !entry;
             ConfigureTabNavigation();
@@ -418,8 +427,11 @@ namespace LP_PopovD_App
                 loginInput.TabIndex = 0;
                 passwordInput.TabIndex = 1;
                 bool registration = screen == AppScreen.Registration;
-                emailInput.TabIndex = codeInput.TabIndex = 2;
-                int next = registration || loginFlow.CodeRequested ? 3 : 2;
+                emailInput.TabIndex = 2;
+                codeInput.TabIndex = registration ? 3 : 2;
+                int next = registration
+                    ? (accounts.RegistrationCodeRequested ? 4 : 3)
+                    : (loginFlow.CodeRequested ? 3 : 2);
                 if (!registration)
                     rememberCheck.TabIndex = next++;
                 submitButton.TabIndex = next++;
@@ -443,6 +455,8 @@ namespace LP_PopovD_App
                 { entryButton, registrationButton, entryScheduleButton },
             AppScreen.Menu => new Control[]
                 { rentButton, profileButton, informationButton, scheduleButton, backButton },
+            AppScreen.Registration when accounts.RegistrationCodeRequested => new Control[]
+                { loginInput, passwordInput, emailInput, codeInput, submitButton, backButton },
             AppScreen.Registration => new Control[]
                 { loginInput, passwordInput, emailInput, submitButton, backButton },
             AppScreen.Login when loginFlow.CodeRequested => new Control[]
@@ -553,6 +567,7 @@ namespace LP_PopovD_App
                 HideScreenControls();
                 ClearValues();
                 loginFlow.Reset();
+                accounts.Reset();
                 authStatus = "";
                 screen = target;
                 scheduleFocus = focusSchedule;
