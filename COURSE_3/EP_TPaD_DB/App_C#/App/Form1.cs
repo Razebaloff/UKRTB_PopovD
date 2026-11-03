@@ -701,7 +701,9 @@ namespace LP_PopovD_App
                         ShowScreenControls(forCapture: true);
                         Bitmap after = CaptureScreen();
                         focusCodeAfterTransition = true;
-                        BeginTransition(before, after, Center(submitButton), soft: true);
+                        // В регистрации меняются позиции всех полей, а не
+                        // только нижняя область — нужен полный переход.
+                        BeginTransition(before, after, Center(submitButton));
                     }
                     else if (string.IsNullOrWhiteSpace(codeInput.Value))
                     {
@@ -768,9 +770,34 @@ namespace LP_PopovD_App
             catch (OperationCanceledException) { }
             catch (InvalidOperationException error)
             {
-                // Ошибки OTP/дубликата/SMTP показываем без вывода пароля
-                // и без исходных сообщений сетевых библиотек.
                 authStatus = error.Message;
+                bool expiredOrLocked = registration
+                    ? !accounts.RegistrationCodeRequested
+                    : loginFlow.CodeRequested && !accounts.LoginCodeRequested;
+                if (expiredOrLocked)
+                {
+                    // Истёкший или заблокированный код не должен оставлять
+                    // форму в состоянии, где новый запрос невозможен.
+                    if (!registration) loginFlow.Reset();
+                    try
+                    {
+                        Bitmap? initial = await cache.GetAsync(new(screen));
+                        if (initial != null && cache == surfaces && !IsDisposed && !Disposing)
+                        {
+                            sceneCache = initial;
+                            changingValues = true;
+                            try { codeInput.Value = ""; }
+                            finally { changingValues = false; }
+                            LayoutSceneControls();
+                            RefreshInputFabric();
+                        }
+                    }
+                    catch (Exception restoreError)
+                    {
+                        Debug.WriteLine("Verification layout reset failed: " +
+                            restoreError.GetType().Name);
+                    }
+                }
                 ShowScreenControls();
                 Invalidate(true);
             }
