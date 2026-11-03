@@ -1006,6 +1006,35 @@ namespace LP_PopovD_App
         {
             if (exporting || Busy) return;
             AppScreen exportScreen = screen;
+            if (exportScreen == AppScreen.Schedule)
+            {
+                // В расписании есть живой дочерний контрол: сохраняем
+                // действительно видимую недельную таблицу, а не только
+                // ледовый фон из 32K-экспортера статичных экранов.
+                using SaveFileDialog screenshot = new()
+                {
+                    Title = "Сохранить расписание в PNG (размер текущего окна)",
+                    Filter = "PNG без потерь (*.png)|*.png",
+                    FileName = "Расписание_занятий.png",
+                    DefaultExt = "png",
+                    AddExtension = true,
+                    OverwritePrompt = true
+                };
+                if (screenshot.ShowDialog(this) != DialogResult.OK) return;
+                exporting = true;
+                try
+                {
+                    using Bitmap snapshot = CaptureScreen();
+                    snapshot.Save(screenshot.FileName, ImageFormat.Png);
+                }
+                catch (Exception error)
+                {
+                    MessageBox.Show(this, error.Message, "Не удалось сохранить расписание",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally { exporting = false; }
+                return;
+            }
             using SaveFileDialog dialog = new()
             {
                 Title = "Сохранить экран в 32K — 30720 × 17280",
