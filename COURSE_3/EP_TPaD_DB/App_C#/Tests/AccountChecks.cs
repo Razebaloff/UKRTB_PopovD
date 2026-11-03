@@ -24,7 +24,7 @@ try
         return Task.CompletedTask;
     }
 
-    HockeyAccountService registration = new(db, Deliver);
+    HockeyAccountService registration = new(db, Deliver, demoCodeMode: false);
     Check(!registration.RegistrationCodeRequested, "No code requested initially");
     await registration.RequestRegistrationAsync("HockeyPlayer", "strong-password-0123", "player@example.com");
     Check(registration.RegistrationCodeRequested, "Registration code requested");
@@ -51,7 +51,7 @@ try
     Check(!System.Text.Encoding.UTF8.GetString(bytes).Contains("strong-password-0123"),
         "Plaintext password absent from SQLite file");
 
-    HockeyAccountService second = new(db, Deliver);
+    HockeyAccountService second = new(db, Deliver, demoCodeMode: false);
     try
     {
         await second.RequestRegistrationAsync("HOCKEYPLAYER", "some-other-password", "different@example.com");
@@ -66,7 +66,7 @@ try
     }
     catch (InvalidOperationException) { tests++; }
 
-    HockeyAccountService login = new(db, Deliver);
+    HockeyAccountService login = new(db, Deliver, demoCodeMode: false);
     await login.RequestLoginAsync("HockeyPlayer", "strong-password-0123");
     Check(login.LoginCodeRequested && deliveredTo == "player@example.com" &&
         lastPurpose == EmailCodePurpose.Login, "Login OTP only to stored email");
@@ -78,6 +78,47 @@ try
     catch (InvalidOperationException) { tests++; }
     login.CompleteLogin(delivered!);
     Check(!login.LoginCodeRequested, "Login OTP consumed and successful");
+    // Демонстрационный режим по умолчанию: никакой SMTP-отправки,
+    // любое НЕПУСТОЕ значение кода, запись в настоящую SQLite.
+    int unexpectedDeliveries = 0;
+    Task NoMail(string destination, string oneTimeCode, EmailCodePurpose purpose)
+    {
+        unexpectedDeliveries++;
+        return Task.CompletedTask;
+    }
+    HockeyAccountService demoRegistration = new(db, NoMail);
+    await demoRegistration.RequestRegistrationAsync(
+        "DemoHockey", "demo-strong-password", "demo@example.com");
+    Check(demoRegistration.RegistrationCodeRequested,
+        "Demo registration opens code step without email");
+    Check(unexpectedDeliveries == 0, "Demo never sends email");
+    try
+    {
+        await demoRegistration.CompleteRegistrationAsync("   ");
+        throw new Exception("Blank demo code accepted");
+    }
+    catch (InvalidOperationException) { tests++; }
+    Check(await db.VerifyLoginAsync("DemoHockey", "demo-strong-password") == null,
+        "Account is not created until any nonempty demo code");
+    await demoRegistration.CompleteRegistrationAsync("любые буквы и символы!");
+    Check(await db.VerifyLoginAsync("DemoHockey", "demo-strong-password") == "demo@example.com",
+        "Demo registration persists account after arbitrary code");
+    Check(!demoRegistration.RegistrationCodeRequested, "Demo registration step consumed");
+
+    HockeyAccountService demoLogin = new(db, NoMail);
+    try
+    {
+        await demoLogin.RequestLoginAsync("DemoHockey", "incorrect");
+        throw new Exception("Demo bypassed database password check");
+    }
+    catch (InvalidOperationException) { tests++; }
+    await demoLogin.RequestLoginAsync("DemoHockey", "demo-strong-password");
+    Check(demoLogin.LoginCodeRequested && unexpectedDeliveries == 0,
+        "Demo login checks saved credentials and does not email");
+    demoLogin.CompleteLogin("непустой код 42!");
+    Check(!demoLogin.LoginCodeRequested && unexpectedDeliveries == 0,
+        "Any nonblank demo code finishes login without SMTP");
+
     Console.WriteLine($"Passed: {tests} SQLite and OTP checks.");
 }
 finally
