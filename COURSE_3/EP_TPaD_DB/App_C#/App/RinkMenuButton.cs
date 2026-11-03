@@ -9,6 +9,9 @@ namespace LP_PopovD_App
         private bool pressed;
         private Bitmap? buttonLayer, captionLayer, frostTexture, iceTexture;
         private readonly FrostHoverAnimation frost;
+        private FrostSpeck[]? frostSpecks;
+        protected float HoverIceAmount => frost.Amount;
+        protected virtual void OnFrostFrame() { }
         private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
         private (Size Size, string Text, int Color, bool Pressed) captionKey;
@@ -26,7 +29,12 @@ namespace LP_PopovD_App
             UseVisualStyleBackColor = false;
             Cursor = Cursors.Hand;
             AccessibleRole = AccessibleRole.PushButton;
-            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost = new FrostHoverAnimation(() =>
+            {
+                if (IsDisposed || !IsHandleCreated) return;
+                Invalidate();
+                OnFrostFrame();
+            });
             frost.SetVisible(Visible);
         }
 
@@ -37,6 +45,7 @@ namespace LP_PopovD_App
             iceTexture?.Dispose();
             frostTexture = iceTexture = null;
             frostTextureSize = Size.Empty;
+            frostSpecks = null;
             if (Width < 2 || Height < 2)
                 return;
             using GraphicsPath shape = new();
@@ -78,20 +87,25 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;
             g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
+            // Микрокристаллы оседают, растут и тают независимо. Каждый
+            // следующий цикл выбирает новые точки из детерминированного seed.
+            frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true,
+                8491 + Text.Length * 71);
             float ambient = frost.Ambient * (1 - frost.Amount);
-            if (ambient > .002f || frost.Amount > .002f)
+            if (ambient > .015f)
+                FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
+                    FrostHoverAnimation.Seconds, ambient, true);
+            if (frost.Amount > .002f)
             {
-                if (frostTexture == null || frostTextureSize != ClientSize)
+                if (iceTexture == null || frostTextureSize != ClientSize)
                 {
                     frostTexture?.Dispose();
+                    iceTexture?.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
                     iceTexture = FrostDrawing.CreateIceLayer(frostTexture, true);
                 }
-                if (ambient > .002f)
-                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
-                if (frost.Amount > .002f && iceTexture != null)
-                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
