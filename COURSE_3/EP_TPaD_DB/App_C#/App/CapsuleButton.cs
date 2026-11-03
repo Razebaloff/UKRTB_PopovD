@@ -10,6 +10,7 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
+        private FrostSpeck[]? frostSpecks;
         private Bitmap? frostTexture, iceTexture, captionLayer;
         private Size frostTextureSize;
         private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
@@ -46,6 +47,7 @@ namespace LP_PopovD_App
             iceTexture?.Dispose();
             frostTexture = iceTexture = null;
             frostTextureSize = Size.Empty;
+            frostSpecks = null;
             captionLayer?.Dispose();
             captionLayer = null;
         }
@@ -77,20 +79,23 @@ namespace LP_PopovD_App
             g.DrawPath(edge, shape);
             // Сначала нарастает иней по краям овальной тканевой вставки,
             // затем поверх него остаётся хорошо читаемая надпись.
+            frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, false,
+                3751 + Text.Length * 109);
             float ambient = frost.Ambient * (1 - frost.Amount);
-            if (ambient > .002f || frost.Amount > .002f)
+            if (ambient > .015f)
+                FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
+                    FrostHoverAnimation.Seconds, ambient, false);
+            if (frost.Amount > .002f)
             {
-                if (frostTexture == null || frostTextureSize != ClientSize)
+                if (iceTexture == null || frostTextureSize != ClientSize)
                 {
                     frostTexture?.Dispose();
+                    iceTexture?.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
                     iceTexture = FrostDrawing.CreateIceLayer(frostTexture, false);
                 }
-                if (ambient > .002f)
-                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
-                if (frost.Amount > .002f && iceTexture != null)
-                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
             }
             var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
             if (captionLayer == null || captionKey != labelKey)
