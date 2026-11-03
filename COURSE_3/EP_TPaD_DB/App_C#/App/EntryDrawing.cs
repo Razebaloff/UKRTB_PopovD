@@ -6,7 +6,8 @@ namespace LP_PopovD_App
     internal static class EntryDrawing
     {
         internal const float PuckDiameter = 330;
-        internal static readonly PointF[] PuckCenters = { new(400, 350), new(1200, 350), new(800, 605) };
+        // Три шайбы стартового экрана выровнены на единой горизонтали.
+        internal static readonly PointF[] PuckCenters = { new(300, 445), new(800, 445), new(1300, 445) };
         internal static readonly string[] Captions = { "ВОЙТИ", "ЗАРЕГИСТРИРОВАТЬСЯ", "РАСПИСАНИЕ" };
 
         internal static void Draw(Graphics g, RectangleF? viewport = null, bool includeSticks = true)
