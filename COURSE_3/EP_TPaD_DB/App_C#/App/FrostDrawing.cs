@@ -13,6 +13,7 @@ namespace LP_PopovD_App
         private static readonly System.Windows.Forms.Timer sharedTimer = CreateTimer();
         private readonly Stopwatch transition = new();
         private readonly Action invalidate;
+        private readonly float transitionMilliseconds;
         private float from, target;
         private bool visible, disposed;
         private int lastAmbientFrame = -1;
@@ -50,7 +51,11 @@ namespace LP_PopovD_App
         // не заставляет всю поверхность замерзать и таять одновременно.
         internal float Ambient => visible ? 1f : 0f;
 
-        internal FrostHoverAnimation(Action invalidate) => this.invalidate = invalidate;
+        internal FrostHoverAnimation(Action invalidate, int hoverDurationMilliseconds = 285)
+        {
+            this.invalidate = invalidate;
+            transitionMilliseconds = Math.Max(180, hoverDurationMilliseconds);
+        }
 
         internal void SetVisible(bool value)
         {
@@ -86,7 +91,8 @@ namespace LP_PopovD_App
         private void UpdateAmount()
         {
             if (!transition.IsRunning) return;
-            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 285f), 0, 1);
+            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds /
+                transitionMilliseconds), 0, 1);
             Amount = from + (target - from) * SnowDrawing.Smooth(p);
             if (p >= 1)
             {
@@ -370,15 +376,22 @@ namespace LP_PopovD_App
             for (int i = 0; i < specks.Length; i++)
             {
                 FrostSpeck speck = specks[i];
-                float cycles = (seconds - speck.Phase) / SpeckCycle;
+                // На шайбах морозные прожилки растут и тают медленнее,
+                // чем на небольших овальных кнопках входа.
+                float speedFactor = round ? 1.65f : 1f;
+                float period = SpeckCycle * speedFactor;
+                float cycles = (seconds - speck.Phase * speedFactor) / period;
                 int generation = (int)MathF.Floor(cycles);
-                float age = (cycles - generation) * SpeckCycle;
-                float total = speck.Grow + speck.Hold + speck.Melt;
+                float age = (cycles - generation) * period;
+                float growTime = speck.Grow * speedFactor;
+                float holdTime = speck.Hold * speedFactor;
+                float meltTime = speck.Melt * speedFactor;
+                float total = growTime + holdTime + meltTime;
                 if (age > total) continue;
 
-                float growth = SnowDrawing.Smooth(Math.Clamp(age / speck.Grow, 0, 1));
-                float fade = age < speck.Grow + speck.Hold ? 1 :
-                    1 - SnowDrawing.Smooth((age - speck.Grow - speck.Hold) / speck.Melt);
+                float growth = SnowDrawing.Smooth(Math.Clamp(age / growTime, 0, 1));
+                float fade = age < growTime + holdTime ? 1 :
+                    1 - SnowDrawing.Smooth((age - growTime - holdTime) / meltTime);
                 float strength = fade * speck.Opacity * intensity;
                 if (strength < .07f) continue;
                 int growthStep = Math.Clamp((int)(growth * GrowthStages), 0, GrowthStages - 1);
@@ -426,9 +439,15 @@ namespace LP_PopovD_App
                 Bitmap layer = new(size.Width, size.Height, PixelFormat.Format32bppPArgb);
                 layer.SetResolution(96, 96);
                 frames[frame] = layer;
-                if (frame == 0) continue;
+                if (frame == 0 || size.Width < 5 || size.Height < 5) continue;
                 using Graphics g = Graphics.FromImage(layer);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
+                // Каждый промежуточный кадр обязан сохранять альфа-маску
+                // круглой/овальной кнопки. Это исключает прямоугольные
+                // углы, заметные при анимации по бокам.
+                using GraphicsPath silhouette = Shape(new RectangleF(1, 1,
+                    size.Width - 2, size.Height - 2), round);
+                g.SetClip(silhouette, CombineMode.Intersect);
                 if (frame == framesCount - 1)
                 {
                     g.DrawImageUnscaled(fullIce, 0, 0);
@@ -460,9 +479,16 @@ namespace LP_PopovD_App
         }
 
         internal static void DrawIceGrowth(Graphics g, Bitmap[] stages, Rectangle bounds,
-            float amount)
+            float amount, bool round)
         {
-            if (amount <= .001f || stages.Length < 2) return;
+            if (amount <= .001f || stages.Length < 2 ||
+                bounds.Width < 5 || bounds.Height < 5) return;
+            GraphicsState original = g.Save();
+            // Гарантия, что ни один растровый кадр не закрашивает углы
+            // ограничивающего прямоугольника кнопки.
+            using GraphicsPath silhouette = Shape(new RectangleF(bounds.X + 1,
+                bounds.Y + 1, bounds.Width - 2, bounds.Height - 2), round);
+            g.SetClip(silhouette, CombineMode.Intersect);
             float p = SnowDrawing.Smooth(Math.Clamp(amount, 0, 1));
             float frame = p * (stages.Length - 1);
             int index = Math.Clamp((int)frame, 0, stages.Length - 1);
@@ -474,6 +500,7 @@ namespace LP_PopovD_App
                 if (blend > .002f)
                     DrawLayer(g, stages[index + 1], bounds, blend);
             }
+            g.Restore(original);
         }
 
         // На каждом кадре выполняется только одна альфа-композиция
@@ -529,9 +556,6 @@ namespace LP_PopovD_App
             alpha.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(.88f * p, 0, 1) });
             g.InterpolationMode = InterpolationMode.Bilinear;
             g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height, GraphicsUnit.Pixel, alpha);
-            using Pen edge = new(Color.FromArgb((int)(200 * p), 245, 252, 255),
-                Math.Max(1f, bounds.Height * .018f)) { LineJoin = LineJoin.Round };
-            g.DrawPath(edge, shape);
             Random random = new(unchecked(bounds.Width * 1567 + bounds.Height * 1163 + (round ? 7291 : 113)));
             using Pen fracture = new(Color.White, .8f);
             int count = round ? 19 : 12;

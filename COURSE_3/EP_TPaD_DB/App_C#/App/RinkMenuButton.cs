@@ -35,7 +35,7 @@ namespace LP_PopovD_App
                 if (IsDisposed || !IsHandleCreated) return;
                 Invalidate();
                 OnFrostFrame();
-            });
+            }, this is PuckButton ? 900 : 285);
             frost.SetVisible(Visible);
         }
 
@@ -110,7 +110,7 @@ namespace LP_PopovD_App
                     using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, true);
                     iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, true);
                 }
-                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount, true);
             }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
@@ -129,16 +129,8 @@ namespace LP_PopovD_App
                 captionKey = labelKey;
             }
             g.DrawImageUnscaled(captionLayer, 0, 0);
-            if (Focused)
-            {
-                // Контрастная клавиатурная подсветка вместо стандартного
-                // синего прямоугольника фокуса WinForms.
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                using Pen focusRing = new(Color.FromArgb(195, 241, 253, 255), 1.5f)
-                    { DashStyle = DashStyle.Dash };
-                g.DrawEllipse(focusRing, 4, 4,
-                    Math.Max(1, Width - 9), Math.Max(1, Height - 9));
-            }
+            // Клавиатурный фокус обозначается подсветкой фактуры в
+            // DrawButton, без белого пунктирного кольца вокруг шайбы.
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
