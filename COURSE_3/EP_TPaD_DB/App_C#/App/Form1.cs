@@ -75,7 +75,7 @@ namespace LP_PopovD_App
             loginInput = new CapsuleInput("Логин", "ВВЕДИТЕ ЛОГИН") { TabIndex = 0 };
             passwordInput = new CapsuleInput("Пароль", "ВВЕДИТЕ ПАРОЛЬ", password: true, maxLength: 128) { TabIndex = 1 };
             emailInput = new CapsuleInput("Электронная почта", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ", maxLength: 254) { TabIndex = 2 };
-            codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 6) { TabIndex = 2 };
+            codeInput = new CapsuleInput("Демонстрационный код", "ВВЕДИТЕ ЛЮБОЙ КОД", maxLength: 128) { TabIndex = 2 };
             rememberCheck = new RememberCheckBox { TabIndex = 3 };
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
             backButton = new CapsuleButton(crackOnHover: true)
@@ -685,17 +685,17 @@ namespace LP_PopovD_App
                 {
                     if (!accounts.RegistrationCodeRequested)
                     {
-                        // На почту действительно отправляется 6-значный OTP,
-                        // иначе поле для кода не показываем.
+                        // Демо: открываем поле после проверки данных, но не
+                        // отправляем письмо. SQLite при этом остаётся реальной.
                         Bitmap? next = await cache.GetAsync(new(AppScreen.Registration, true));
                         if (next == null || cache != surfaces || IsDisposed || Disposing) return;
-                        authStatus = "Отправляем код подтверждения…";
+                        authStatus = "Демо: открываем поле кода без отправки письма.";
                         Invalidate(true);
                         await accounts.RequestRegistrationAsync(
                             loginInput.Value.Trim(), passwordInput.Value, emailInput.Value.Trim());
                         Bitmap before = CaptureScreen();
                         sceneCache = next;
-                        authStatus = "Код отправлен на почту. Действует 10 минут.";
+                        authStatus = "Письмо не отправляется. Введите любой код.";
                         LayoutSceneControls();
                         RefreshInputFabric();
                         ShowScreenControls(forCapture: true);
@@ -707,13 +707,13 @@ namespace LP_PopovD_App
                     }
                     else if (string.IsNullOrWhiteSpace(codeInput.Value))
                     {
-                        authStatus = "Введите шестизначный код.";
+                        authStatus = "Введите любое непустое значение кода.";
                         codeInput.FocusInput();
                         Invalidate(true);
                     }
                     else
                     {
-                        // INSERT выполняется только после проверки OTP.
+                        // INSERT выполняется после формального заполнения кода.
                         // Пароль в БД сохраняется исключительно хешем.
                         await accounts.CompleteRegistrationAsync(codeInput.Value.Trim());
                         registrationCompleted = true;
@@ -723,14 +723,15 @@ namespace LP_PopovD_App
                 {
                     Bitmap? next = await cache.GetAsync(new(AppScreen.Login, true));
                     if (next == null || cache != surfaces || IsDisposed || Disposing) return;
-                    authStatus = "Проверяем данные и отправляем код…";
+                    authStatus = "Проверяем логин и пароль в базе данных…";
                     Invalidate(true);
                     // Нельзя войти по произвольному логину/паролю.
-                    // Идентификационные данные сверяются с SQLite.
+                    // Идентификационные данные сверяются с SQLite,
+                    // а поле кода в деморежиме принимает любое непустое значение.
                     await accounts.RequestLoginAsync(loginInput.Value.Trim(), passwordInput.Value);
                     Bitmap before = CaptureScreen();
                     loginFlow.RequestCode();
-                    authStatus = "Код отправлен на зарегистрированную почту.";
+                    authStatus = "Демо: письмо не отправляется. Введите любой код.";
                     sceneCache = next;
                     LayoutSceneControls();
                     RefreshInputFabric();
@@ -741,7 +742,7 @@ namespace LP_PopovD_App
                 }
                 else if (string.IsNullOrWhiteSpace(codeInput.Value))
                 {
-                    authStatus = "Введите шестизначный код.";
+                    authStatus = "Введите любое непустое значение кода.";
                     codeInput.FocusInput();
                     Invalidate(true);
                 }
@@ -804,7 +805,7 @@ namespace LP_PopovD_App
             catch (Exception error)
             {
                 Debug.WriteLine("Account operation failed: " + error.GetType().Name);
-                authStatus = "Не удалось обратиться к базе данных или почте.";
+                authStatus = "Не удалось обратиться к базе данных.";
                 ShowScreenControls();
                 Invalidate(true);
             }
