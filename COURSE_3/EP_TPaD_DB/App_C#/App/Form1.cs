@@ -28,7 +28,11 @@ namespace LP_PopovD_App
         private readonly RememberCheckBox rememberCheck;
         private readonly CapsuleButton submitButton, backButton;
         private string authStatus = "", rememberedLogin = "", successLogin = "";
-        private bool successRemember;
+        private bool successRemember, successFromRegistration;
+        private string? authenticatedLogin;
+        // Имя вошедшего пользователя хранится в памяти текущей сессии.
+        // Регистрация устанавливает его после записи аккаунта в SQLite.
+        internal string? AuthenticatedLogin => authenticatedLogin;
 
         private bool Busy => loading || preparingAction || stickAnimation.Active || transitionFrom != null || loginSuccess != null;
         private SceneSurfaceKey CurrentKey => new(screen,
@@ -123,6 +127,17 @@ namespace LP_PopovD_App
                 Invalidate(true);
                 return;
             }
+            // Если регистрация уже сохранена в БД, изменение размера
+            // окна не должно возвращать пользователя на форму с
+            // использованным кодом. Сразу продолжаем в меню.
+            bool registeredDuringAnimation = successFromRegistration && loginSuccess != null;
+            if (registeredDuringAnimation)
+            {
+                authenticatedLogin = successLogin;
+                screen = AppScreen.Menu;
+                accounts.Reset();
+                loginFlow.Reset();
+            }
             CancelButtonAnimation();
             DropTransition();
             CancelLoginAnimation();
@@ -161,7 +176,9 @@ namespace LP_PopovD_App
         private async Task WarmScenesAsync(SceneSurfaceCache cache)
         {
             SceneSurfaceKey[] keys = { new(AppScreen.Login), new(AppScreen.Login, true),
-                new(AppScreen.Login, true, true), new(AppScreen.Registration), new(AppScreen.Menu), new(AppScreen.Entry) };
+                new(AppScreen.Login, true, true), new(AppScreen.Registration),
+                new(AppScreen.Registration, true), new(AppScreen.Registration, true, true),
+                new(AppScreen.Menu), new(AppScreen.Entry) };
             try
             {
                 foreach (SceneSurfaceKey key in keys)
@@ -247,7 +264,11 @@ namespace LP_PopovD_App
                 {
                     if (!accounts.RegistrationCodeRequested)
                         await cache.GetAsync(new(AppScreen.Registration, true));
-                    else await cache.GetAsync(new(AppScreen.Login));
+                    else
+                    {
+                        await cache.GetAsync(new(AppScreen.Registration, true, true));
+                        await cache.GetAsync(new(AppScreen.Menu));
+                    }
                 }
                 if (cache != surfaces || IsDisposed || Disposing) return;
                 StickFeedbackDrawing.Prepare(ClientSize);
@@ -578,6 +599,8 @@ namespace LP_PopovD_App
                 accounts.Reset();
                 authStatus = "";
                 screen = target;
+                if (target == AppScreen.Entry)
+                    authenticatedLogin = null;
                 scheduleFocus = focusSchedule;
                 focusCodeAfterTransition = false;
                 if (target == AppScreen.Login)
@@ -677,7 +700,6 @@ namespace LP_PopovD_App
             }
 
             SceneSurfaceCache cache = surfaces;
-            bool registrationCompleted = false;
             preparingAction = true;
             try
             {
@@ -713,10 +735,17 @@ namespace LP_PopovD_App
                     }
                     else
                     {
-                        // INSERT выполняется после формального заполнения кода.
-                        // Пароль в БД сохраняется исключительно хешем.
+                        // Точно такая же завершающая анимация, что и
+                        // при входе: рассеивание четырёх полей, снег,
+                        // фамилия на майке и переход сразу в Menu.
+                        // Изображения готовим ДО записи в SQLite, чтобы
+                        // после успешного INSERT не зависеть от рендера.
+                        Bitmap? cleanSurface = await cache.GetAsync(
+                            new(AppScreen.Registration, true, true));
+                        await cache.GetAsync(new(AppScreen.Menu));
+                        if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
                         await accounts.CompleteRegistrationAsync(codeInput.Value.Trim());
-                        registrationCompleted = true;
+                        StartSuccessAnimation(cleanSurface, registration: true);
                     }
                 }
                 else if (!loginFlow.CodeRequested)
@@ -753,19 +782,7 @@ namespace LP_PopovD_App
                     if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
                     accounts.CompleteLogin(codeInput.Value.Trim());
                     if (!loginFlow.TryConfirm(codeInput.Value)) return;
-                    successLogin = loginInput.Value.Trim();
-                    successRemember = rememberCheck.Checked;
-                    Bitmap before = CaptureScreen();
-                    Bitmap clean = cleanSurface.Clone(new Rectangle(Point.Empty, cleanSurface.Size), PixelFormat.Format32bppPArgb);
-                    using (Graphics g = Graphics.FromImage(clean))
-                        StickFeedbackDrawing.Draw(g, ClientSize);
-                    try { loginSuccess = new LoginSuccessDrawing(ClientSize, before, clean, successLogin); }
-                    catch { before.Dispose(); clean.Dispose(); loginFlow.CancelAnimation(); throw; }
-                    HideScreenControls();
-                    ActiveControl = null;
-                    successClock.Reset();
-                    successTimer.Start();
-                    Invalidate(true);
+                    StartSuccessAnimation(cleanSurface, registration: false);
                 }
             }
             catch (OperationCanceledException) { }
@@ -814,17 +831,48 @@ namespace LP_PopovD_App
                 if (cache == surfaces) preparingAction = false;
             }
 
-            if (registrationCompleted && cache == surfaces && !IsDisposed && !Disposing)
+        }
+
+        private void StartSuccessAnimation(Bitmap cleanSurface, bool registration)
+        {
+            // Обе ветки используют одну последовательность LoginSuccessDrawing.
+            // Конфигурация регистрации учитывает дополнительное поле почты.
+            successLogin = loginInput.Value.Trim();
+            successRemember = !registration && rememberCheck.Checked;
+            Bitmap before = CaptureScreen();
+            Bitmap clean;
+            try
             {
-                // После подтверждения регистрации предлагаем настоящий
-                // вход с сохранёнными в БД учётными данными.
-                await NavigateAsync(AppScreen.Login, Center(submitButton));
-                if (screen == AppScreen.Login && !IsDisposed && !Disposing)
-                {
-                    authStatus = "Учётная запись создана. Войдите.";
-                    Invalidate(ToPixels(JerseyDrawing.LoginStatusBounds));
-                }
+                clean = cleanSurface.Clone(new Rectangle(Point.Empty, cleanSurface.Size),
+                    PixelFormat.Format32bppPArgb);
             }
+            catch
+            {
+                before.Dispose();
+                if (!registration) loginFlow.CancelAnimation();
+                throw;
+            }
+            try
+            {
+                using (Graphics graphics = Graphics.FromImage(clean))
+                    StickFeedbackDrawing.Draw(graphics, ClientSize);
+                loginSuccess = new LoginSuccessDrawing(ClientSize, before, clean,
+                    successLogin, registration);
+            }
+            catch
+            {
+                before.Dispose();
+                clean.Dispose();
+                if (!registration) loginFlow.CancelAnimation();
+                throw;
+            }
+
+            successFromRegistration = registration;
+            HideScreenControls();
+            ActiveControl = null;
+            successClock.Reset();
+            successTimer.Start();
+            Invalidate(true);
         }
 
         private void CompleteLoginAnimation()
@@ -833,8 +881,16 @@ namespace LP_PopovD_App
             successTimer.Stop(); successClock.Reset();
             Bitmap final = loginSuccess.Render(LoginSuccessDrawing.DurationMilliseconds);
             loginSuccess.Dispose(); loginSuccess = null;
-            rememberedLogin = successRemember ? successLogin : "";
-            _ = preferences.SaveAsync(successLogin, successRemember);
+
+            // После сохранения регистрации аккаунт уже создан: считать
+            // пользователя вошедшим, не спрашивая пароль второй раз.
+            authenticatedLogin = successLogin;
+            if (!successFromRegistration)
+            {
+                rememberedLogin = successRemember ? successLogin : "";
+                _ = preferences.SaveAsync(successLogin, successRemember);
+            }
+            successFromRegistration = false;
             PointF origin = Center(submitButton);
             _ = NavigateAsync(AppScreen.Menu, origin, suppliedBefore: final);
         }
@@ -844,6 +900,7 @@ namespace LP_PopovD_App
             if (successTimer == null) return;
             successTimer.Stop(); successClock.Reset();
             loginSuccess?.Dispose(); loginSuccess = null;
+            successFromRegistration = false;
             loginFlow.CancelAnimation();
         }
 
@@ -875,7 +932,13 @@ namespace LP_PopovD_App
             {
                 if (preparingAction) { e.Handled = e.SuppressKeyPress = true; return; }
                 if (stickAnimation.Active) { CancelButtonAnimation(); ShowScreenControls(); Invalidate(true); }
-                else if (loginSuccess != null) { CancelLoginAnimation(); ShowScreenControls(); codeInput.FocusInput(); Invalidate(true); }
+                else if (loginSuccess != null)
+                {
+                    // Регистрация уже записана в SQLite: Esc ускоряет
+                    // завершение анимации, но не отменяет автоматический вход.
+                    if (successFromRegistration) CompleteLoginAnimation();
+                    else { CancelLoginAnimation(); ShowScreenControls(); codeInput.FocusInput(); Invalidate(true); }
+                }
                 else if (transitionFrom != null) FinishTransition();
                 else if (screen != AppScreen.Entry) _ = NavigateAsync(AppScreen.Entry, Center(backButton));
                 else Close();
