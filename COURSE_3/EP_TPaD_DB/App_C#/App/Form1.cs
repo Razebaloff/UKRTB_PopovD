@@ -241,6 +241,12 @@ namespace LP_PopovD_App
                         await cache.GetAsync(new(AppScreen.Menu));
                     }
                 }
+                if (button == submitButton && screen == AppScreen.Registration)
+                {
+                    if (!accounts.RegistrationCodeRequested)
+                        await cache.GetAsync(new(AppScreen.Registration, true));
+                    else await cache.GetAsync(new(AppScreen.Login));
+                }
                 if (cache != surfaces || IsDisposed || Disposing) return;
                 StickFeedbackDrawing.Prepare(ClientSize);
                 stickBackdrop?.Dispose();
@@ -622,30 +628,43 @@ namespace LP_PopovD_App
         {
             if (changingValues) return;
             ClearStatus(sender, e);
-            if (screen != AppScreen.Login || !loginFlow.CodeRequested || loginFlow.Animating || surfaces == null) return;
+            if (surfaces == null || Busy || screen is not (AppScreen.Login or AppScreen.Registration)) return;
+            bool registration = screen == AppScreen.Registration;
+            if (registration ? !accounts.RegistrationCodeRequested : !loginFlow.CodeRequested) return;
+
+            // Изменение логина/пароля/почты инвалидирует ранее
+            // высланный код. Код нельзя использовать для других данных.
+            accounts.Reset();
             loginFlow.Reset();
             changingValues = true;
             try { codeInput.Value = ""; } finally { changingValues = false; }
+
             SceneSurfaceCache cache = surfaces;
             try
             {
-                Bitmap? image = await cache.GetAsync(new(AppScreen.Login));
-                if (image == null || cache != surfaces || IsDisposed || Disposing || screen != AppScreen.Login) return;
+                Bitmap? image = await cache.GetAsync(new(screen));
+                if (image == null || cache != surfaces || IsDisposed || Disposing) return;
                 sceneCache = image;
                 LayoutSceneControls();
                 RefreshInputFabric();
                 ShowScreenControls();
-                authStatus = "Данные изменены. Запросите код ещё раз.";
+                authStatus = "Данные изменены. Запросите код повторно.";
                 Invalidate(true);
             }
             catch (OperationCanceledException) { }
-            catch (Exception error) { ShowRenderError(error, cache); }
+            catch (Exception error)
+            {
+                Debug.WriteLine("Updating verification form: " + error.GetType().Name);
+                authStatus = "Не удалось обновить форму.";
+                Invalidate(true);
+            }
         }
 
         private async Task SubmitAuthAsync()
         {
-            if (Busy || surfaces == null || screen is not AppScreen.Login and not AppScreen.Registration) return;
-            var issue = AuthInputRules.Validate(screen == AppScreen.Registration,
+            if (Busy || surfaces == null || screen is not (AppScreen.Login or AppScreen.Registration)) return;
+            bool registration = screen == AppScreen.Registration;
+            var issue = AuthInputRules.Validate(registration,
                 loginInput.Value, passwordInput.Value, emailInput.Value);
             if (issue.Field >= 0)
             {
@@ -654,23 +673,60 @@ namespace LP_PopovD_App
                 Invalidate(true);
                 return;
             }
-            if (screen == AppScreen.Registration)
-            {
-                authStatus = "Сервис регистрации ещё не подключён.";
-                Invalidate(true);
-                return;
-            }
+
             SceneSurfaceCache cache = surfaces;
+            bool registrationCompleted = false;
             preparingAction = true;
             try
             {
-                if (!loginFlow.CodeRequested)
+                if (registration)
+                {
+                    if (!accounts.RegistrationCodeRequested)
+                    {
+                        // На почту действительно отправляется 6-значный OTP,
+                        // иначе поле для кода не показываем.
+                        Bitmap? next = await cache.GetAsync(new(AppScreen.Registration, true));
+                        if (next == null || cache != surfaces || IsDisposed || Disposing) return;
+                        authStatus = "Отправляем код подтверждения…";
+                        Invalidate(true);
+                        await accounts.RequestRegistrationAsync(
+                            loginInput.Value.Trim(), passwordInput.Value, emailInput.Value.Trim());
+                        Bitmap before = CaptureScreen();
+                        sceneCache = next;
+                        authStatus = "Код отправлен на почту. Действует 10 минут.";
+                        LayoutSceneControls();
+                        RefreshInputFabric();
+                        ShowScreenControls(forCapture: true);
+                        Bitmap after = CaptureScreen();
+                        focusCodeAfterTransition = true;
+                        BeginTransition(before, after, Center(submitButton), soft: true);
+                    }
+                    else if (string.IsNullOrWhiteSpace(codeInput.Value))
+                    {
+                        authStatus = "Введите шестизначный код.";
+                        codeInput.FocusInput();
+                        Invalidate(true);
+                    }
+                    else
+                    {
+                        // INSERT выполняется только после проверки OTP.
+                        // Пароль в БД сохраняется исключительно хешем.
+                        await accounts.CompleteRegistrationAsync(codeInput.Value.Trim());
+                        registrationCompleted = true;
+                    }
+                }
+                else if (!loginFlow.CodeRequested)
                 {
                     Bitmap? next = await cache.GetAsync(new(AppScreen.Login, true));
                     if (next == null || cache != surfaces || IsDisposed || Disposing) return;
+                    authStatus = "Проверяем данные и отправляем код…";
+                    Invalidate(true);
+                    // Нельзя войти по произвольному логину/паролю.
+                    // Идентификационные данные сверяются с SQLite.
+                    await accounts.RequestLoginAsync(loginInput.Value.Trim(), passwordInput.Value);
                     Bitmap before = CaptureScreen();
                     loginFlow.RequestCode();
-                    authStatus = "Тестовый режим: введите любой непустой код.";
+                    authStatus = "Код отправлен на зарегистрированную почту.";
                     sceneCache = next;
                     LayoutSceneControls();
                     RefreshInputFabric();
@@ -681,7 +737,7 @@ namespace LP_PopovD_App
                 }
                 else if (string.IsNullOrWhiteSpace(codeInput.Value))
                 {
-                    authStatus = "Введите код подтверждения.";
+                    authStatus = "Введите шестизначный код.";
                     codeInput.FocusInput();
                     Invalidate(true);
                 }
@@ -689,12 +745,15 @@ namespace LP_PopovD_App
                 {
                     Bitmap? cleanSurface = await cache.GetAsync(new(AppScreen.Login, true, true));
                     await cache.GetAsync(new(AppScreen.Menu));
-                    if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing || !loginFlow.TryConfirm(codeInput.Value)) return;
+                    if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
+                    accounts.CompleteLogin(codeInput.Value.Trim());
+                    if (!loginFlow.TryConfirm(codeInput.Value)) return;
                     successLogin = loginInput.Value.Trim();
                     successRemember = rememberCheck.Checked;
                     Bitmap before = CaptureScreen();
                     Bitmap clean = cleanSurface.Clone(new Rectangle(Point.Empty, cleanSurface.Size), PixelFormat.Format32bppPArgb);
-                    using (Graphics g = Graphics.FromImage(clean)) StickFeedbackDrawing.Draw(g, ClientSize);
+                    using (Graphics g = Graphics.FromImage(clean))
+                        StickFeedbackDrawing.Draw(g, ClientSize);
                     try { loginSuccess = new LoginSuccessDrawing(ClientSize, before, clean, successLogin); }
                     catch { before.Dispose(); clean.Dispose(); loginFlow.CancelAnimation(); throw; }
                     HideScreenControls();
@@ -705,8 +764,37 @@ namespace LP_PopovD_App
                 }
             }
             catch (OperationCanceledException) { }
-            catch (Exception error) { ShowRenderError(error, cache); ShowScreenControls(); }
-            finally { if (cache == surfaces) preparingAction = false; }
+            catch (InvalidOperationException error)
+            {
+                // Ошибки OTP/дубликата/SMTP показываем без вывода пароля
+                // и без исходных сообщений сетевых библиотек.
+                authStatus = error.Message;
+                ShowScreenControls();
+                Invalidate(true);
+            }
+            catch (Exception error)
+            {
+                Debug.WriteLine("Account operation failed: " + error.GetType().Name);
+                authStatus = "Не удалось обратиться к базе данных или почте.";
+                ShowScreenControls();
+                Invalidate(true);
+            }
+            finally
+            {
+                if (cache == surfaces) preparingAction = false;
+            }
+
+            if (registrationCompleted && cache == surfaces && !IsDisposed && !Disposing)
+            {
+                // После подтверждения регистрации предлагаем настоящий
+                // вход с сохранёнными в БД учётными данными.
+                await NavigateAsync(AppScreen.Login, Center(submitButton));
+                if (screen == AppScreen.Login && !IsDisposed && !Disposing)
+                {
+                    authStatus = "Учётная запись создана. Войдите.";
+                    Invalidate(ToPixels(JerseyDrawing.LoginStatusBounds));
+                }
+            }
         }
 
         private void CompleteLoginAnimation()
