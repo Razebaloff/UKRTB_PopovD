@@ -7,7 +7,27 @@ namespace LP_PopovD_App
 {
     internal sealed class CapsuleInput : UserControl
     {
-        private readonly TextBox input = new();
+        // Диалоговые клавиши обрабатываем непосредственно внутри Edit,
+        // чтобы Tab не зависел от вложенности WinForms UserControl.
+        private sealed class TabTextBox : TextBox
+        {
+            private bool ForwardTab(Keys keyData)
+            {
+                if ((keyData & Keys.KeyCode) != Keys.Tab ||
+                    (keyData & ~(Keys.KeyCode | Keys.Shift)) != Keys.None)
+                    return false;
+                return FindForm() is Form1 form &&
+                    form.MoveFocusByTab((keyData & Keys.Shift) != 0);
+            }
+
+            protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+                => ForwardTab(keyData) || base.ProcessCmdKey(ref msg, keyData);
+
+            protected override bool ProcessDialogKey(Keys keyData)
+                => ForwardTab(keyData) || base.ProcessDialogKey(keyData);
+        }
+
+        private readonly TabTextBox input = new();
         private Font? inputFont;
         private float textPixels;
         private IntPtr fabricBrush;
