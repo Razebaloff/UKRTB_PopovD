@@ -39,8 +39,18 @@ namespace LP_PopovD_App
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            NativeIceDrawing.Draw(g, size);
-            DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks, codeRequested: codeRequested, authPanels: authPanels);
+            if (screen == AppScreen.Schedule)
+            {
+                // Расписание занимает всю поверхность окна. Фоновая
+                // сцена не содержит ни бортов, ни линий хоккейной арены.
+                ScheduleBoard.DrawBackdrop(g, size);
+            }
+            else
+            {
+                NativeIceDrawing.Draw(g, size);
+                DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks,
+                    codeRequested: codeRequested, authPanels: authPanels);
+            }
             g.Restore(saved);
         }
 
@@ -95,11 +105,8 @@ namespace LP_PopovD_App
                     JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks, codeRequested, authPanels);
                     break;
                 case AppScreen.Schedule:
-                    // Общая ледовая арена остаётся фоном; недельная таблица
-                    // размещается поверх как интерактивный ScheduleBoard.
-                    RinkDrawing.Draw(g);
-                    if (includeControls)
-                        JerseyDrawing.DrawCapsule(g, JerseyDrawing.BackBounds, "НАЗАД", false);
+                    // Реальная сетка и кнопка «НАЗАД» — дочерние контролы
+                    // Form1, не встроенный рисунок хоккейного поля.
                     break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);
