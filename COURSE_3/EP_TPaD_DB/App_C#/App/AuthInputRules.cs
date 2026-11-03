@@ -11,6 +11,8 @@ namespace LP_PopovD_App
             if (registration && (!MailAddress.TryCreate(email.Trim(), out MailAddress? address) ||
                 address.Address != email.Trim()))
                 return (2, "Проверьте адрес электронной почты.");
+            if (registration && password.Length < 8)
+                return (1, "Пароль должен содержать минимум 8 символов.");
             return (-1, "");
         }
     }
