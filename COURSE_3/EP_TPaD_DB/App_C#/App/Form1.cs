@@ -388,7 +388,49 @@ namespace LP_PopovD_App
             codeInput.Visible = screen == AppScreen.Login && loginFlow.CodeRequested;
             rememberCheck.Visible = screen == AppScreen.Login;
             backButton.Visible = !entry;
-            AcceptButton = entry ? entryButton : auth ? submitButton : null;
+            ConfigureTabNavigation();
+            // Enter на кнопке вызывает именно выбранную Tab кнопку.
+            // В формах авторизации Enter в TextBox выполняет Submit.
+            AcceptButton = auth ? submitButton : null;
+        }
+
+        private void ConfigureTabNavigation()
+        {
+            // Невидимые элементы автоматически исключаются из Tab;
+            // индекс активных задаётся явно для каждого интерфейса.
+            if (screen == AppScreen.Entry)
+            {
+                entryButton.TabIndex = 0;
+                registrationButton.TabIndex = 1;
+                entryScheduleButton.TabIndex = 2;
+            }
+            else if (screen == AppScreen.Menu)
+            {
+                rentButton.TabIndex = 0;
+                profileButton.TabIndex = 1;
+                informationButton.TabIndex = 2;
+                scheduleButton.TabIndex = 3;
+                backButton.TabIndex = 4;
+            }
+            else
+            {
+                loginInput.TabIndex = 0;
+                passwordInput.TabIndex = 1;
+                bool registration = screen == AppScreen.Registration;
+                emailInput.TabIndex = codeInput.TabIndex = 2;
+                int next = registration || loginFlow.CodeRequested ? 3 : 2;
+                if (!registration)
+                    rememberCheck.TabIndex = next++;
+                submitButton.TabIndex = next++;
+                backButton.TabIndex = next;
+            }
+
+            foreach (Control control in Controls)
+            {
+                control.TabStop = control.Visible;
+                // Внешний UserControl не должен перехватывать Tab
+                // вместо вложенного TextBox; он направляет фокус внутрь.
+            }
         }
 
         private Bitmap CaptureScreen(bool withoutSticks = false)
@@ -496,6 +538,7 @@ namespace LP_PopovD_App
             if (screen == AppScreen.Entry) entryButton.Focus();
             else if (screen == AppScreen.Menu) { if (scheduleFocus) scheduleButton.Focus(); else rentButton.Focus(); }
             else if (focusCodeAfterTransition) { codeInput.FocusInput(); focusCodeAfterTransition = false; }
+            else if (screen is AppScreen.Login or AppScreen.Registration) loginInput.FocusInput();
             else backButton.Focus();
             Invalidate(true);
         }
