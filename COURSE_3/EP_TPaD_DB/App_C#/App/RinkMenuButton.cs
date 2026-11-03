@@ -7,16 +7,14 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer, captionLayer, frostTexture;
-        private Bitmap[]? iceFrames;
+        private Bitmap? buttonLayer, captionLayer;
         private readonly FrostHoverAnimation frost;
         private FrostSpeck[]? frostSpecks;
-        // Заледенение при наведении оставлено только на стартовых
-        // шайбах. Круглые кнопки расписания/аренды/профиля без корки.
-        protected virtual bool UsesHoverIce => this is PuckButton;
-        protected float HoverIceAmount => UsesHoverIce ? frost.Amount : 0;
+        // При наведении на шайбу растут только трещины во льду ВОКРУГ,
+        // не появляется голубая прозрачная плёнка на самой шайбе.
+        protected virtual bool TracksHoverCracks => this is PuckButton;
+        protected float HoverCrackAmount => TracksHoverCracks ? frost.Amount : 0;
         protected virtual void OnFrostFrame() { }
-        private Size frostTextureSize;
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
         private (Size Size, string Text, int Color, bool Pressed) captionKey;
         protected override bool ShowFocusCues => false;
@@ -45,12 +43,6 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            frostTexture?.Dispose();
-            frostTexture = null;
-            if (iceFrames != null)
-                foreach (Bitmap stage in iceFrames) stage.Dispose();
-            iceFrames = null;
-            frostTextureSize = Size.Empty;
             frostSpecks = null;
             if (Width < 2 || Height < 2)
                 return;
@@ -97,24 +89,10 @@ namespace LP_PopovD_App
             // следующий цикл выбирает новые точки из детерминированного seed.
             frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true,
                 8491 + Text.Length * 71);
-            float ambient = frost.Ambient * (UsesHoverIce ? 1 - frost.Amount : 1);
+            float ambient = frost.Ambient;
             if (ambient > .015f)
                 FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
                     FrostHoverAnimation.Seconds, ambient, true);
-            if (UsesHoverIce && frost.Amount > .002f)
-            {
-                if (iceFrames == null || frostTextureSize != ClientSize)
-                {
-                    frostTexture?.Dispose();
-                    if (iceFrames != null)
-                        foreach (Bitmap stage in iceFrames) stage.Dispose();
-                    frostTextureSize = ClientSize;
-                    frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
-                    using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, true);
-                    iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, true);
-                }
-                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount, true);
-            }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
             // промежуточные кадры инея используют готовый прозрачный спрайт.
@@ -155,7 +133,7 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
-            if (UsesHoverIce) frost.SetTarget(true);
+            if (TracksHoverCracks) frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
@@ -164,7 +142,7 @@ namespace LP_PopovD_App
         {
             hovered = false;
             pressed = false;
-            if (UsesHoverIce) frost.SetTarget(false);
+            if (TracksHoverCracks) frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -224,9 +202,6 @@ namespace LP_PopovD_App
             if (disposing)
             {
                 frost?.Dispose();
-                frostTexture?.Dispose();
-                if (iceFrames != null)
-                    foreach (Bitmap stage in iceFrames) stage.Dispose();
                 captionLayer?.Dispose();
                 buttonLayer?.Dispose();
             }
