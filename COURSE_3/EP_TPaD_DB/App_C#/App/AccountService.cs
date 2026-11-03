@@ -257,7 +257,8 @@ namespace LP_PopovD_App
         {
             if (await database.ExistsAsync(login, email))
                 throw new InvalidOperationException("Логин или электронная почта уже зарегистрированы.");
-            var credential = HockeyUserDatabase.HashPassword(password);
+            // PBKDF2 намеренно выполняется вне UI-потока.
+            var credential = await Task.Run(() => HockeyUserDatabase.HashPassword(password));
             await SendCodeAsync(EmailCodePurpose.Registration, login, email, credential);
         }
 
@@ -307,6 +308,9 @@ namespace LP_PopovD_App
             await database.InsertAsync(entry.Login, entry.Email,
                 entry.PasswordSalt!, entry.PasswordHash!, entry.Iterations);
             Reset();
+            // После успешной регистрации разрешаем немедленно запросить
+            // ОТДЕЛЬНЫЙ код для первого входа в созданную учётную запись.
+            lastSent = DateTimeOffset.MinValue;
         }
 
         internal void CompleteLogin(string code)
