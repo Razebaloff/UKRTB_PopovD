@@ -24,6 +24,24 @@ Check(login.TryConfirm("retry"), "После отмены можно повто�
 login.Reset();
 Check(!login.CodeRequested && !login.TryConfirm("old"), "Смена данных/экрана отменяет прежний запрос кода.");
 
+// 08:00–21:00 — рабочий интервал ледовой арены. Каждая тренировка
+// занимает 60 минут, 10 минут подготовки находятся только между слотами.
+IReadOnlyList<TrainingSlot> slots = TrainingSchedule.Slots;
+Check(slots.Count == 11, "Рабочий день содержит 11 полных часовых сеансов.");
+Check(slots[0].Start == new TimeOnly(8, 0) &&
+    slots[0].End == new TimeOnly(9, 0), "Первое занятие 08:00–09:00.");
+Check(slots[^1].Start == new TimeOnly(19, 40) &&
+    slots[^1].End == new TimeOnly(20, 40), "Последний час заканчивается до 21:00.");
+Check(slots.All(slot => (slot.End - slot.Start).TotalMinutes == 60),
+    "Каждый сеанс длится ровно 60 минут.");
+for (int i = 1; i < slots.Count; i++)
+    Check((slots[i].Start - slots[i - 1].End).TotalMinutes == 10,
+        "Между сеансами ровно 10 минут без отдельного слота.");
+Check(slots.All(slot => slot.End <= TrainingSchedule.Closing),
+    "Расписание не выходит за время закрытия.");
+Check(TrainingSchedule.MondayOf(new DateTime(2026, 11, 1)) ==
+    new DateTime(2026, 10, 26), "Неделя начинается с понедельника.");
+
 StickAnimationState sticks = new();
 int actions = 0;
 Check(sticks.TryBegin(() => actions++), "Клюшки запускаются.");
