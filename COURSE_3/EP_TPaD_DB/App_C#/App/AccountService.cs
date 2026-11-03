@@ -197,14 +197,22 @@ namespace LP_PopovD_App
 
         private PendingCode? pending;
         private DateTimeOffset lastSent;
+        // Временный режим прототипа: письмо НЕ отправляется, а любое
+        // непустое значение поля кода подходит для регистрации и входа.
+        // Реальную SMTP-проверку можно вернуть, переключив режим явно.
+        internal const bool DemoVerificationEnabled = true;
+
         private readonly HockeyUserDatabase database;
         private readonly Func<string, string, EmailCodePurpose, Task> deliver;
+        private readonly bool demoCodeMode;
 
         internal HockeyAccountService(HockeyUserDatabase? database = null,
-            Func<string, string, EmailCodePurpose, Task>? deliver = null)
+            Func<string, string, EmailCodePurpose, Task>? deliver = null,
+            bool demoCodeMode = DemoVerificationEnabled)
         {
             this.database = database ?? new HockeyUserDatabase();
             this.deliver = deliver ?? HockeyVerificationMail.SendAsync;
+            this.demoCodeMode = demoCodeMode;
         }
 
         internal bool RegistrationCodeRequested => pending?.Purpose == EmailCodePurpose.Registration;
@@ -225,12 +233,13 @@ namespace LP_PopovD_App
         private async Task SendCodeAsync(EmailCodePurpose purpose, string login, string email,
             (byte[] Salt, byte[] Hash, int Iterations)? credential = null)
         {
-            CheckCooldown();
-            string code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6", CultureInfo.InvariantCulture);
-            byte[] secret = RandomNumberGenerator.GetBytes(32);
-            byte[] digest;
-            using (HMACSHA256 hmac = new(secret))
-                digest = hmac.ComputeHash(Encoding.ASCII.GetBytes(code));
+            if (!demoCodeMode) CheckCooldown();
+            // В демонстрационном режиме нет ни генерации OTP, ни
+            // сетевого запроса, ни требования к SMTP-конфигурации.
+            string? code = demoCodeMode ? null :
+                RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6", CultureInfo.InvariantCulture);
+            byte[] secret = demoCodeMode ? Array.Empty<byte>() : RandomNumberGenerator.GetBytes(32);
+            byte[] digest = demoCodeMode ? Array.Empty<byte>() : HashCode(secret, code!);
 
             PendingCode candidate = new()
             {
@@ -239,18 +248,27 @@ namespace LP_PopovD_App
                 Email = email.Trim(),
                 Secret = secret,
                 Digest = digest,
-                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(10),
+                ExpiresAt = demoCodeMode ? DateTimeOffset.MaxValue : DateTimeOffset.UtcNow.AddMinutes(10),
                 PasswordSalt = credential?.Salt,
                 PasswordHash = credential?.Hash,
                 Iterations = credential?.Iterations ?? 0
             };
 
-            try { await deliver(email, code, purpose); }
-            catch { candidate.Clear(); throw; }
+            if (!demoCodeMode)
+            {
+                try { await deliver(email, code!, purpose); }
+                catch { candidate.Clear(); throw; }
+            }
 
             Reset();
             pending = candidate;
-            lastSent = DateTimeOffset.UtcNow;
+            if (!demoCodeMode) lastSent = DateTimeOffset.UtcNow;
+        }
+
+        private static byte[] HashCode(byte[] secret, string code)
+        {
+            using HMACSHA256 hmac = new(secret);
+            return hmac.ComputeHash(Encoding.ASCII.GetBytes(code));
         }
 
         internal async Task RequestRegistrationAsync(string login, string password, string email)
@@ -274,7 +292,13 @@ namespace LP_PopovD_App
         {
             PendingCode? entry = pending;
             if (entry == null || entry.Purpose != purpose)
-                throw new InvalidOperationException("Сначала запросите код подтверждения.");
+                throw new InvalidOperationException("Сначала откройте поле кода.");
+            if (demoCodeMode)
+            {
+                if (string.IsNullOrWhiteSpace(code))
+                    throw new InvalidOperationException("Введите любое непустое значение кода.");
+                return entry;
+            }
             if (DateTimeOffset.UtcNow > entry.ExpiresAt)
             {
                 Reset();
