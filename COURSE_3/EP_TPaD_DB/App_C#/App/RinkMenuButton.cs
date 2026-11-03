@@ -7,7 +7,8 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer, captionLayer, frostTexture, iceTexture;
+        private Bitmap? buttonLayer, captionLayer, frostTexture;
+        private Bitmap[]? iceFrames;
         private readonly FrostHoverAnimation frost;
         private FrostSpeck[]? frostSpecks;
         protected float HoverIceAmount => frost.Amount;
@@ -42,8 +43,10 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostTexture?.Dispose();
-            iceTexture?.Dispose();
-            frostTexture = iceTexture = null;
+            frostTexture = null;
+            if (iceFrames != null)
+                foreach (Bitmap stage in iceFrames) stage.Dispose();
+            iceFrames = null;
             frostTextureSize = Size.Empty;
             frostSpecks = null;
             if (Width < 2 || Height < 2)
@@ -97,15 +100,17 @@ namespace LP_PopovD_App
                     FrostHoverAnimation.Seconds, ambient, true);
             if (frost.Amount > .002f)
             {
-                if (iceTexture == null || frostTextureSize != ClientSize)
+                if (iceFrames == null || frostTextureSize != ClientSize)
                 {
                     frostTexture?.Dispose();
-                    iceTexture?.Dispose();
+                    if (iceFrames != null)
+                        foreach (Bitmap stage in iceFrames) stage.Dispose();
                     frostTextureSize = ClientSize;
                     frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
-                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, true);
+                    using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, true);
+                    iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, true);
                 }
-                FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount);
             }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
@@ -124,6 +129,16 @@ namespace LP_PopovD_App
                 captionKey = labelKey;
             }
             g.DrawImageUnscaled(captionLayer, 0, 0);
+            if (Focused)
+            {
+                // Контрастная клавиатурная подсветка вместо стандартного
+                // синего прямоугольника фокуса WinForms.
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using Pen focusRing = new(Color.FromArgb(195, 241, 253, 255), 1.5f)
+                    { DashStyle = DashStyle.Dash };
+                g.DrawEllipse(focusRing, 4, 4,
+                    Math.Max(1, Width - 9), Math.Max(1, Height - 9));
+            }
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -215,7 +230,8 @@ namespace LP_PopovD_App
             {
                 frost?.Dispose();
                 frostTexture?.Dispose();
-                iceTexture?.Dispose();
+                if (iceFrames != null)
+                    foreach (Bitmap stage in iceFrames) stage.Dispose();
                 captionLayer?.Dispose();
                 buttonLayer?.Dispose();
             }
