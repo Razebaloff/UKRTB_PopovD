@@ -75,7 +75,7 @@ namespace LP_PopovD_App
             loginInput = new CapsuleInput("Логин", "ВВЕДИТЕ ЛОГИН") { TabIndex = 0 };
             passwordInput = new CapsuleInput("Пароль", "ВВЕДИТЕ ПАРОЛЬ", password: true, maxLength: 128) { TabIndex = 1 };
             emailInput = new CapsuleInput("Электронная почта", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ", maxLength: 254) { TabIndex = 2 };
-            codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 128) { TabIndex = 2 };
+            codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 6) { TabIndex = 2 };
             rememberCheck = new RememberCheckBox { TabIndex = 3 };
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
             backButton = new CapsuleButton(crackOnHover: true)
