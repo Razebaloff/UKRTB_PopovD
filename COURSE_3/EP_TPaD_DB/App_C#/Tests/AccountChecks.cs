@@ -123,5 +123,8 @@ try
 }
 finally
 {
+    // На Windows пул SQLite может удерживать файл после Dispose.
+    // Закрываем пул до удаления временной тестовой базы.
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     Directory.Delete(folder, recursive: true);
 }
