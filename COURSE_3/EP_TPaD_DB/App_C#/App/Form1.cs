@@ -78,7 +78,7 @@ namespace LP_PopovD_App
             codeInput = new CapsuleInput("Код из электронной почты", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ", maxLength: 128) { TabIndex = 2 };
             rememberCheck = new RememberCheckBox { TabIndex = 3 };
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
-            backButton = new CapsuleButton
+            backButton = new CapsuleButton(crackOnHover: true)
             { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
             foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
             {
@@ -219,6 +219,8 @@ namespace LP_PopovD_App
                 registrationButton.PaintCrackedIce(e.Graphics);
                 entryScheduleButton.PaintCrackedIce(e.Graphics);
             }
+            if (screen != AppScreen.Entry && !loading)
+                backButton.PaintCrackedIce(e.Graphics);
         }
 
         private async void HandleAnimatedButtonClick(object? sender, EventArgs e)
