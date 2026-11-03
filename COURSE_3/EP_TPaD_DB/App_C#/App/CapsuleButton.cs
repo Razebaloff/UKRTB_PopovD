@@ -10,19 +10,15 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
-        private readonly bool specialHoverIce;
         private FrostSpeck[]? frostSpecks;
-        private Bitmap? frostTexture, captionLayer;
-        private Bitmap[]? iceFrames;
-        private Size frostTextureSize;
+        private Bitmap? captionLayer;
         private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
         [DefaultValue(false)]
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
 
-        internal CapsuleButton(bool specialHoverIce = false)
+        internal CapsuleButton()
         {
-            this.specialHoverIce = specialHoverIce;
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
@@ -31,8 +27,7 @@ namespace LP_PopovD_App
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
             frost = new FrostHoverAnimation(
-                () => { if (!IsDisposed && IsHandleCreated) Invalidate(); },
-                specialHoverIce ? 900 : 285);
+                () => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
             frost.SetVisible(Visible);
         }
         internal void SetScale(float scale)
@@ -48,12 +43,6 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            frostTexture?.Dispose();
-            frostTexture = null;
-            if (iceFrames != null)
-                foreach (Bitmap stage in iceFrames) stage.Dispose();
-            iceFrames = null;
-            frostTextureSize = Size.Empty;
             frostSpecks = null;
             captionLayer?.Dispose();
             captionLayer = null;
@@ -88,39 +77,13 @@ namespace LP_PopovD_App
             // затем поверх него остаётся хорошо читаемая надпись.
             frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, false,
                 3751 + Text.Length * 109);
-            float ambient = frost.Ambient * (specialHoverIce ? 1 - frost.Amount : 1);
+            // На всех овальных кнопках — только тонкие морозные прожилки.
+            // Без квадратной вырезки: мягкое затухание узоров под надписью
+            // рассчитывается отдельно для каждой прожилки в FrostDrawing.
+            float ambient = frost.Ambient;
             if (ambient > .015f)
-            {
-                GraphicsState beforeFrost = g.Save();
-                if (Primary)
-                {
-                    // Морозные прожилки на кнопке отправки кода не должны
-                    // пересекать центральную зону надписи: над текстом
-                    // никогда не возникает второе светлое изображение.
-                    int guardHeight = Math.Min(Height - 4,
-                        Math.Max(18, (int)(Height * .47f)));
-                    int side = Math.Max(9, (int)(Width * .07f));
-                    g.ExcludeClip(new Rectangle(side, (Height - guardHeight) / 2,
-                        Math.Max(1, Width - 2 * side), guardHeight));
-                }
                 FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
-                    FrostHoverAnimation.Seconds, ambient, false);
-                g.Restore(beforeFrost);
-            }
-            if (specialHoverIce && frost.Amount > .002f)
-            {
-                if (iceFrames == null || frostTextureSize != ClientSize)
-                {
-                    frostTexture?.Dispose();
-                    if (iceFrames != null)
-                        foreach (Bitmap stage in iceFrames) stage.Dispose();
-                    frostTextureSize = ClientSize;
-                    frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
-                    using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, false);
-                    iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, false);
-                }
-                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount, false);
-            }
+                    FrostHoverAnimation.Seconds, ambient, false, protectCaption: Primary);
             var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
             if (captionLayer == null || captionKey != labelKey)
             {
@@ -155,14 +118,12 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
-            if (specialHoverIce) frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
         protected override void OnMouseLeave(EventArgs e)
         {
             hovered = pressed = false;
-            if (specialHoverIce) frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -175,9 +136,6 @@ namespace LP_PopovD_App
             if (disposing)
             {
                 frost?.Dispose();
-                frostTexture?.Dispose();
-                if (iceFrames != null)
-                    foreach (Bitmap stage in iceFrames) stage.Dispose();
                 captionLayer?.Dispose();
                 labelFont?.Dispose();
             }
