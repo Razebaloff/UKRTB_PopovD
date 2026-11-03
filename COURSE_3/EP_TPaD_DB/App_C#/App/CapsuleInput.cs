@@ -8,9 +8,7 @@ namespace LP_PopovD_App
     internal sealed class CapsuleInput : UserControl
     {
         private readonly TextBox input = new();
-        private readonly Label cue = new();
         private Font? inputFont;
-        private Font? cueFont;
         private float textPixels;
         private IntPtr fabricBrush;
         protected override bool ShowFocusCues => false;
@@ -43,20 +41,18 @@ namespace LP_PopovD_App
             input.TabStop = true;
             input.AcceptsTab = false;
             if (password) input.ImeMode = ImeMode.Disable;
-            cue.Text = placeholder;
-            cue.TextAlign = ContentAlignment.MiddleCenter;
-            cue.BackColor = Color.Transparent;
-            cue.ForeColor = JerseyFieldDrawing.CueInk;
-            cue.TabStop = false;
-            cue.Cursor = Cursors.IBeam;
-            cue.AccessibleName = placeholder;
-            cue.Click += (_, _) => input.Focus();
-            input.Enter += (_, _) => { cue.Visible = false; Invalidate(); };
-            input.Leave += (_, _) => { UpdateCue(); Invalidate(); };
-            input.TextChanged += (_, _) => { UpdateCue(); input.Invalidate(); ValueChanged?.Invoke(this, EventArgs.Empty); };
+            // Единственный визуальный элемент для ввода — настоящий
+            // TextBox. Нативная подсказка заменяет перекрывающий Label,
+            // который давал посторонние фрагменты по краям поля.
+            input.PlaceholderText = placeholder;
+            input.Enter += (_, _) => Invalidate();
+            input.Leave += (_, _) => Invalidate();
+            input.TextChanged += (_, _) =>
+            {
+                input.Invalidate();
+                ValueChanged?.Invoke(this, EventArgs.Empty);
+            };
             Controls.Add(input);
-            Controls.Add(cue);
-            cue.BringToFront();
             SetScale(1);
         }
 
@@ -65,20 +61,11 @@ namespace LP_PopovD_App
             float pixels = Math.Max(12, 22 * scale);
             if (Math.Abs(textPixels - pixels) < 0.05f) return;
             textPixels = pixels;
-            Font? oldInput = inputFont, oldCue = cueFont;
+            Font? oldInput = inputFont;
             inputFont = new Font(RinkTypography.FamilyName, pixels, FontStyle.Regular, GraphicsUnit.Pixel);
-            cueFont = new Font(RinkTypography.FamilyName, Math.Max(12, 21 * scale), FontStyle.Bold, GraphicsUnit.Pixel);
             input.Font = inputFont;
-            cue.Font = cueFont;
             oldInput?.Dispose();
-            oldCue?.Dispose();
             LayoutInput();
-        }
-
-        private void UpdateCue()
-        {
-            cue.Visible = input.TextLength == 0 && !input.Focused;
-            if (cue.Visible) cue.BringToFront();
         }
 
         private void LayoutInput()
@@ -89,7 +76,6 @@ namespace LP_PopovD_App
             int textHeight = Math.Min(Height - 8, input.PreferredHeight);
             input.Bounds = new Rectangle(inset, (Height - textHeight) / 2,
                 Math.Max(1, Width - inset * 2), Math.Max(1, textHeight));
-            cue.Bounds = new Rectangle(inset, 4, Math.Max(1, Width - inset * 2), Math.Max(1, Height - 8));
         }
 
         protected override void OnResize(EventArgs e) { base.OnResize(e); LayoutInput(); }
@@ -112,16 +98,19 @@ namespace LP_PopovD_App
         {
             OnPaintBackground(e);
             base.OnPaint(e);
-            if (input.Focused && Width > 6 && Height > 6)
+            if (input.Focused && Width > 12 && Height > 8)
             {
-                // Аккуратный фокус по самой форме тканевой вставки,
-                // без дополнительных контролов и рамок вокруг TextBox.
+                // Tab-фокус виден по тонкому индикатору СНИЗУ.
+                // Левых скобок и дополнительных элементов внутри поля нет.
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using GraphicsPath capsule = JerseyDrawing.Capsule(
-                    new RectangleF(2, 2, Width - 4, Height - 4));
-                using Pen focus = new(Color.FromArgb(225, 46, 122, 174),
-                    Math.Max(1.5f, Height * .027f));
-                e.Graphics.DrawPath(focus, capsule);
+                using Pen indicator = new(Color.FromArgb(215, 72, 166, 216),
+                    Math.Max(1.5f, Height * .032f))
+                {
+                    StartCap = LineCap.Round,
+                    EndCap = LineCap.Round
+                };
+                e.Graphics.DrawLine(indicator, Width * .29f, Height - 3,
+                    Width * .71f, Height - 3);
             }
         }
 
@@ -177,7 +166,7 @@ namespace LP_PopovD_App
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { ClearFabricBrush(); inputFont?.Dispose(); cueFont?.Dispose(); }
+            if (disposing) { ClearFabricBrush(); inputFont?.Dispose(); }
             base.Dispose(disposing);
         }
     }
