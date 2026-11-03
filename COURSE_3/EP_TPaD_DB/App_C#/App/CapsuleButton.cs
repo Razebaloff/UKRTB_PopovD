@@ -100,7 +100,7 @@ namespace LP_PopovD_App
                     using Bitmap fullIce = FrostDrawing.CreateIceLayer(frostTexture, false);
                     iceFrames = FrostDrawing.CreateIceGrowthFrames(fullIce, false);
                 }
-                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount);
+                FrostDrawing.DrawIceGrowth(g, iceFrames, ClientRectangle, frost.Amount, false);
             }
             var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
             if (captionLayer == null || captionKey != labelKey)
@@ -130,12 +130,8 @@ namespace LP_PopovD_App
                 captionKey = labelKey;
             }
             g.DrawImageUnscaled(captionLayer, 0, 0);
-            if (Focused)
-            {
-                using Pen focusRing = new(Color.FromArgb(205, 240, 252, 255), 1.4f)
-                    { DashStyle = DashStyle.Dash };
-                g.DrawPath(focusRing, shape);
-            }
+            // Фокус выделяется небольшим изменением цвета самой кнопки.
+            // Отдельная белая контурная линия не создаётся.
         }
         protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
