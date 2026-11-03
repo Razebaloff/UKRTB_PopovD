@@ -27,7 +27,9 @@ namespace LP_PopovD_App
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            TabStop = true;
+            // Tab проходит сразу к вложенному TextBox, не останавливаясь
+            // на рамке UserControl. Излишние элементы слева не появляются.
+            TabStop = false;
             Cursor = Cursors.IBeam;
             AccessibleName = name;
             input.BorderStyle = BorderStyle.None;
@@ -110,7 +112,17 @@ namespace LP_PopovD_App
         {
             OnPaintBackground(e);
             base.OnPaint(e);
-
+            if (input.Focused && Width > 6 && Height > 6)
+            {
+                // Аккуратный фокус по самой форме тканевой вставки,
+                // без дополнительных контролов и рамок вокруг TextBox.
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using GraphicsPath capsule = JerseyDrawing.Capsule(
+                    new RectangleF(2, 2, Width - 4, Height - 4));
+                using Pen focus = new(Color.FromArgb(225, 46, 122, 174),
+                    Math.Max(1.5f, Height * .027f));
+                e.Graphics.DrawPath(focus, capsule);
+            }
         }
 
         // Стандартный EDIT сохраняет каретку, выделение, Tab, IME и маскировку пароля.
