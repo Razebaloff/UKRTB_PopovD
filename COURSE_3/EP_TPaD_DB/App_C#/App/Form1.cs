@@ -207,6 +207,14 @@ namespace LP_PopovD_App
                 return;
             }
             PaintScene(e.Graphics, ClientRectangle);
+            // Трещины являются частью льда под шайбами, а не содержимым
+            // круглых HWND: родительская сцена рисует их за границами кнопки.
+            if (screen == AppScreen.Entry && !loading)
+            {
+                entryButton.PaintCrackedIce(e.Graphics);
+                registrationButton.PaintCrackedIce(e.Graphics);
+                entryScheduleButton.PaintCrackedIce(e.Graphics);
+            }
         }
 
         private async void HandleAnimatedButtonClick(object? sender, EventArgs e)
