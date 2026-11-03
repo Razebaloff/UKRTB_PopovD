@@ -60,9 +60,9 @@ namespace LP_PopovD_App
             string[] prompts = registration
                 ? codeRequested
                     ? new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ",
-                        "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ" }
+                        "ВВЕДИТЕ ЛЮБОЙ КОД" }
                     : new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ", "ВВЕДИТЕ ЭЛЕКТРОННУЮ ПОЧТУ" }
-                : codeRequested ? new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ", "КОД ИЗ ЭЛЕКТРОННОЙ ПОЧТЫ" }
+                : codeRequested ? new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ", "ВВЕДИТЕ ЛЮБОЙ КОД" }
                 : new[] { "ВВЕДИТЕ ЛОГИН", "ВВЕДИТЕ ПАРОЛЬ" };
             for (int i = 0; i < inputs.Length; i++)
                 JerseyFieldDrawing.DrawCue(g, inputs[i], prompts[i]);
