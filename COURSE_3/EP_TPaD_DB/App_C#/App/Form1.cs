@@ -700,6 +700,7 @@ namespace LP_PopovD_App
             }
 
             SceneSurfaceCache cache = surfaces;
+            bool registrationStored = false;
             preparingAction = true;
             try
             {
@@ -745,6 +746,7 @@ namespace LP_PopovD_App
                         await cache.GetAsync(new(AppScreen.Menu));
                         if (cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
                         await accounts.CompleteRegistrationAsync(codeInput.Value.Trim());
+                        registrationStored = true;
                         StartSuccessAnimation(cleanSurface, registration: true);
                     }
                 }
@@ -822,7 +824,9 @@ namespace LP_PopovD_App
             catch (Exception error)
             {
                 Debug.WriteLine("Account operation failed: " + error.GetType().Name);
-                authStatus = "Не удалось обратиться к базе данных.";
+                authStatus = registrationStored
+                    ? "Учётная запись создана. Открываем меню без анимации."
+                    : "Не удалось обратиться к базе данных.";
                 ShowScreenControls();
                 Invalidate(true);
             }
@@ -831,6 +835,14 @@ namespace LP_PopovD_App
                 if (cache == surfaces) preparingAction = false;
             }
 
+            // Если рендер анимации недоступен, регистрация уже
+            // завершилась в SQLite: не требуем зарегистрироваться снова.
+            if (registrationStored && loginSuccess == null &&
+                cache == surfaces && !IsDisposed && !Disposing)
+            {
+                authenticatedLogin = loginInput.Value.Trim();
+                await NavigateAsync(AppScreen.Menu, Center(submitButton));
+            }
         }
 
         private void StartSuccessAnimation(Bitmap cleanSurface, bool registration)
@@ -879,8 +891,15 @@ namespace LP_PopovD_App
         {
             if (loginSuccess == null) return;
             successTimer.Stop(); successClock.Reset();
-            Bitmap final = loginSuccess.Render(LoginSuccessDrawing.DurationMilliseconds);
-            loginSuccess.Dispose(); loginSuccess = null;
+            Bitmap? final = null;
+            try { final = loginSuccess.Render(LoginSuccessDrawing.DurationMilliseconds); }
+            catch (Exception error)
+            {
+                // Не блокируем аутентифицированного пользователя из-за
+                // сбоя только графического рендера последнего кадра.
+                Debug.WriteLine("Success animation rendering failed: " + error.GetType().Name);
+            }
+            finally { loginSuccess.Dispose(); loginSuccess = null; }
 
             // После сохранения регистрации аккаунт уже создан: считать
             // пользователя вошедшим, не спрашивая пароль второй раз.
