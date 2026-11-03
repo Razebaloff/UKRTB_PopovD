@@ -15,9 +15,10 @@ namespace LP_PopovD_App
         private readonly Action invalidate;
         private float from, target;
         private bool visible, disposed;
-        private float lastAmbient = -1;
+        private int lastAmbientFrame = -1;
 
         internal float Amount { get; private set; }
+        internal static float Seconds => (float)sharedTime.Elapsed.TotalSeconds;
 
         private static System.Windows.Forms.Timer CreateTimer()
         {
@@ -32,30 +33,22 @@ namespace LP_PopovD_App
             foreach (FrostHoverAnimation item in active)
             {
                 item.UpdateAmount();
-                // Не будим кнопку ради скрытого инея: при полном
-                // заледенении её фоновый слой не виден.
-                float ambient = item.Ambient * (1 - item.Amount);
+                // Отдельные микрокристаллы изменяются независимо.
+                // Ограничение фонового эффекта ~45 кадрами/с снижает
+                // стоимость перерисовок. Hover остаётся на 16 мс.
+                int frame = (int)(Seconds * 45);
                 bool hovering = item.transition.IsRunning;
-                if (hovering || MathF.Abs(item.lastAmbient - ambient) >= .003f)
+                if (hovering || (item.Amount < .999f && item.lastAmbientFrame != frame))
                 {
-                    item.lastAmbient = ambient;
+                    item.lastAmbientFrame = frame;
                     item.invalidate();
                 }
             }
         }
 
-        internal float Ambient
-        {
-            get
-            {
-                if (!visible) return 0;
-                float t = (float)(sharedTime.Elapsed.TotalSeconds % 6.6) / 6.6f;
-                return t < .34f ? .80f * SnowDrawing.Smooth(t / .34f)
-                    : t < .48f ? .80f
-                    : t < .80f ? .80f * (1 - SnowDrawing.Smooth((t - .48f) / .32f))
-                    : 0f;
-            }
-        }
+        // Каждый очаг инея живёт самостоятельно, общий коэффициент больше
+        // не заставляет всю поверхность замерзать и таять одновременно.
+        internal float Ambient => visible ? 1f : 0f;
 
         internal FrostHoverAnimation(Action invalidate) => this.invalidate = invalidate;
 
@@ -67,7 +60,7 @@ namespace LP_PopovD_App
             {
                 active.Add(this);
                 if (!sharedTimer.Enabled) sharedTimer.Start();
-                lastAmbient = -1;
+                lastAmbientFrame = -1;
                 invalidate();
             }
             else
@@ -106,7 +99,7 @@ namespace LP_PopovD_App
         {
             transition.Reset();
             Amount = from = target = 0;
-            lastAmbient = -1;
+            lastAmbientFrame = -1;
         }
 
         public void Dispose()
@@ -114,6 +107,27 @@ namespace LP_PopovD_App
             if (disposed) return;
             SetVisible(false);
             disposed = true;
+        }
+    }
+
+    // Независимые очаги; Seed меняет точку оседания после каждого цикла.
+    internal readonly struct FrostSpeck
+    {
+        internal readonly uint Seed;
+        internal readonly float Phase, Grow, Hold, Melt, Size, Opacity;
+        internal readonly int Variant;
+
+        internal FrostSpeck(uint seed, float phase, float grow, float hold,
+            float melt, float size, float opacity, int variant)
+        {
+            Seed = seed;
+            Phase = phase;
+            Grow = grow;
+            Hold = hold;
+            Melt = melt;
+            Size = size;
+            Opacity = opacity;
+            Variant = variant;
         }
     }
 
@@ -225,6 +239,150 @@ namespace LP_PopovD_App
                 }
             }
             return bitmap;
+        }
+
+        private const float SpeckCycle = 6.8f;
+        private const int SpeckLevels = 9;
+        private const int SpriteSize = 56;
+        private static readonly Bitmap?[,] speckSprites = new Bitmap[3, SpeckLevels];
+
+        private static uint Mix(uint seed)
+        {
+            seed ^= seed >> 16;
+            seed = unchecked(seed * 0x7feb352du);
+            seed ^= seed >> 15;
+            seed = unchecked(seed * 0x846ca68bu);
+            return seed ^ (seed >> 16);
+        }
+
+        private static float Unit(uint hash) => (hash & 0x00ffffffu) / 16777215f;
+
+        internal static FrostSpeck[] CreateSpecks(Size size, bool round, int seed)
+        {
+            int count = round
+                ? Math.Clamp(size.Width * size.Height / 1600, 35, 74)
+                : Math.Clamp(size.Width * size.Height / 1500, 22, 50);
+            Random random = new(seed);
+            FrostSpeck[] result = new FrostSpeck[count];
+            for (int i = 0; i < count; i++)
+                result[i] = new FrostSpeck(
+                    unchecked((uint)random.NextInt64()),
+                    random.NextSingle() * SpeckCycle,
+                    .24f + random.NextSingle() * .40f,
+                    .12f + random.NextSingle() * .38f,
+                    .45f + random.NextSingle() * .69f,
+                    .055f + random.NextSingle() * .085f,
+                    .55f + random.NextSingle() * .45f,
+                    random.Next(3));
+            return result;
+        }
+
+        private static Bitmap GetSpeckSprite(int variant, int level)
+        {
+            Bitmap? cached = speckSprites[variant, level];
+            if (cached != null) return cached;
+            // 3 формы и 9 градаций прозрачности готовятся только при первом
+            // использовании. Кадр не создаёт GraphicsPath или ImageAttributes.
+            Bitmap image = new(SpriteSize, SpriteSize, PixelFormat.Format32bppPArgb);
+            image.SetResolution(96, 96);
+            using (Graphics g = Graphics.FromImage(image))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                float intensity = (level + 1f) / SpeckLevels;
+                using GraphicsPath bloom = new();
+                bloom.AddEllipse(3, 3, SpriteSize - 6, SpriteSize - 6);
+                using (PathGradientBrush gradient = new(bloom))
+                {
+                    gradient.CenterPoint = new PointF(28, 28);
+                    gradient.CenterColor = Color.FromArgb((int)(105 * intensity), 214, 239, 255);
+                    gradient.SurroundColors = new[] { Color.Transparent };
+                    g.FillPath(gradient, bloom);
+                }
+
+                Random random = new(variant * 739 + 57);
+                using Pen branch = new(Color.FromArgb((int)(212 * intensity), 238, 251, 255), 1f)
+                    { StartCap = LineCap.Round, EndCap = LineCap.Round };
+                using SolidBrush dot = new(Color.FromArgb((int)(168 * intensity), 246, 254, 255));
+                int arms = variant == 1 ? 5 : 6;
+                for (int k = 0; k < arms; k++)
+                {
+                    float angle = MathF.Tau * k / arms + variant * .21f;
+                    float dx = MathF.Cos(angle), dy = MathF.Sin(angle);
+                    float radius = 13 + random.NextSingle() * 8;
+                    g.DrawLine(branch, 28, 28, 28 + dx * radius, 28 + dy * radius);
+                    for (int fork = 1; fork <= 2; fork++)
+                    {
+                        float t = fork * .35f + .12f;
+                        float bx = 28 + dx * radius * t, by = 28 + dy * radius * t;
+                        float d = 3 + radius * .09f;
+                        float a1 = angle + .75f, a2 = angle - .75f;
+                        g.DrawLine(branch, bx, by, bx + MathF.Cos(a1) * d, by + MathF.Sin(a1) * d);
+                        g.DrawLine(branch, bx, by, bx + MathF.Cos(a2) * d, by + MathF.Sin(a2) * d);
+                    }
+                }
+                g.FillEllipse(dot, 25, 25, 6, 6);
+            }
+            speckSprites[variant, level] = image;
+            return image;
+        }
+
+        internal static void DrawSpecks(Graphics g, Rectangle bounds,
+            FrostSpeck[] specks, float seconds, float intensity, bool round)
+        {
+            if (bounds.Width < 5 || bounds.Height < 5 || intensity < .015f) return;
+            GraphicsState state = g.Save();
+            using GraphicsPath clip = Shape(new RectangleF(bounds.X + 1, bounds.Y + 1,
+                bounds.Width - 2, bounds.Height - 2), round);
+            g.SetClip(clip, CombineMode.Intersect);
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            float diameter = Math.Min(bounds.Width, bounds.Height);
+            for (int i = 0; i < specks.Length; i++)
+            {
+                FrostSpeck speck = specks[i];
+                float cycles = (seconds - speck.Phase) / SpeckCycle;
+                int generation = (int)MathF.Floor(cycles);
+                float age = (cycles - generation) * SpeckCycle;
+                float total = speck.Grow + speck.Hold + speck.Melt;
+                if (age > total) continue;
+
+                float alpha;
+                if (age < speck.Grow)
+                    alpha = SnowDrawing.Smooth(age / speck.Grow);
+                else if (age < speck.Grow + speck.Hold)
+                    alpha = 1;
+                else
+                    alpha = 1 - SnowDrawing.Smooth((age - speck.Grow - speck.Hold) / speck.Melt);
+                alpha *= intensity * speck.Opacity;
+                int level = Math.Clamp((int)(alpha * SpeckLevels), 0, SpeckLevels - 1);
+                if (alpha < .07f) continue;
+
+                uint key = Mix(speck.Seed ^ unchecked((uint)generation * 0x9e3779b9u));
+                float u = Unit(Mix(key ^ 0xa24baed4u));
+                float v = Unit(Mix(key ^ 0x48a38b1fu));
+                float x, y;
+                if (round)
+                {
+                    float radius = MathF.Sqrt(u) * .92f;
+                    float angle = v * MathF.Tau;
+                    x = .5f + MathF.Cos(angle) * radius * .46f;
+                    y = .5f + MathF.Sin(angle) * radius * .46f;
+                }
+                else
+                {
+                    x = .08f + u * .84f;
+                    y = .16f + v * .68f;
+                }
+
+                float side = diameter * speck.Size;
+                float growth = .77f + .23f * SnowDrawing.Smooth(age / speck.Grow);
+                float span = side * growth;
+                float cx = bounds.Left + x * bounds.Width;
+                float cy = bounds.Top + y * bounds.Height;
+                Bitmap particle = GetSpeckSprite(speck.Variant, level);
+                g.DrawImage(particle, new RectangleF(cx - span / 2, cy - span / 2, span, span));
+            }
+            g.Restore(state);
         }
 
         // На каждом кадре выполняется только одна альфа-композиция
