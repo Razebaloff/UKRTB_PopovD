@@ -38,6 +38,13 @@ internal static class VisualFeedbackChecks
         using Bitmap hovered = Paint(board, paint);
         Check(ReferenceEquals(firstCache, boardType.GetField("contentCache", Hidden)!.GetValue(board)),
             "Наведение не растеризует текст и всю таблицу повторно.");
+        boardType.GetMethod("OnMouseDown", Hidden)!.Invoke(board,
+            new object[] { new MouseEventArgs(MouseButtons.Left, 1, 200, 210, 0) });
+        using Bitmap selection = Paint(board, paint);
+        Check(ReferenceEquals(firstCache, boardType.GetField("contentCache", Hidden)!.GetValue(board)),
+            "Выбор дня и часа не перестраивает большой кэш расписания.");
+        Check(boardType.GetField("footerCache", Hidden)!.GetValue(board) is Bitmap,
+            "Нижняя панель выбора кэшируется со сглаживанием.");
         enabled.SetValue(board, true);
         using Bitmap planner = Paint(board, paint);
         Check(viewer.GetPixel(800, 489) != planner.GetPixel(800, 489), "Кнопка брони появляется только в режиме аренды.");

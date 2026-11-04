@@ -25,7 +25,7 @@ namespace LP_PopovD_App
         private int selectedDay = ((int)DateTime.Today.DayOfWeek + 6) % 7, selectedSlot, selectedZones = 1;
         private PointF hover = new(-1, -1);
         private string message = "", dataError = "";
-        private Bitmap? contentCache;
+        private Bitmap? contentCache, footerCache;
         internal event Action<Graphics>? OverlayPaint;
         private bool contentDirty = true, bookingEnabled;
         private long lastMinute = DateTime.Now.Ticks / TimeSpan.TicksPerMinute;
@@ -140,16 +140,29 @@ namespace LP_PopovD_App
         {
             if (dataError.Length > 0) return "Данные о занятости недоступны.";
             TrainingBooking? first = At(SelectedDate, selectedSlot, 1), second = At(SelectedDate, selectedSlot, 2);
+            if (!bookingEnabled)
+                return "Зона 1: " + (first == null ? "свободна" : "занята") +
+                    "   ·   Зона 2: " + (second == null ? "свободна" : "занята");
             if (first != null && first.Id == second?.Id) return "Обе зоны: " + first.Tenant;
             return "Зона 1: " + (first?.Tenant ?? "свободна") + "   ·   Зона 2: " + (second?.Tenant ?? "свободна");
         }
 
-        private void ContentChanged() { contentDirty = true; Invalidate(); }
+        private void SelectionChanged()
+        {
+            // При выборе ячейки меняются только рамки и нижняя панель.
+            // Кэш полной таблицы высокого разрешения не перестраивается.
+            footerCache?.Dispose();
+            footerCache = null;
+            Invalidate();
+        }
+
+        private void ContentChanged() { contentDirty = true; SelectionChanged(); }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
             contentCache?.Dispose(); contentCache = null;
+            footerCache?.Dispose(); footerCache = null;
             contentDirty = true;
         }
 
@@ -184,6 +197,7 @@ namespace LP_PopovD_App
                 e.Graphics.PixelOffsetMode = PixelOffsetMode.None;
                 e.Graphics.DrawImage(contentCache, clip, clip, GraphicsUnit.Pixel);
             }
+            DrawSelection(e.Graphics, clip);
             DrawHover(e.Graphics);
             OverlayPaint?.Invoke(e.Graphics);
         }
@@ -206,7 +220,6 @@ namespace LP_PopovD_App
                 using SolidBrush muted = new(Color.FromArgb(119, 161, 186));
                 using SolidBrush freeInk = new(Color.FromArgb(133, 237, 211));
                 using SolidBrush busyInk = new(Color.FromArgb(255, 180, 174));
-                using SolidBrush selected = new(Color.FromArgb(65, 116, 181, 219));
                 using SolidBrush rowFill = new(Color.FromArgb(29, 70, 112, 147));
                 using Pen grid = new(Color.FromArgb(42, 143, 190, 218), 1);
 
@@ -228,7 +241,6 @@ namespace LP_PopovD_App
                 {
                     float x = DaysLeft + day * DayWidth;
                     DateTime date = monday.AddDays(day);
-                    if (day == selectedDay) g.FillRectangle(selected, x + 1, DayHeaderTop, DayWidth - 2, 70);
                     Label(g, date.ToString("ddd", russian).ToUpper(russian) + $"  {date:dd.MM}", medium,
                         date == DateTime.Today ? freeInk : white, new(x, DayHeaderTop, DayWidth, 42));
                     Label(g, "ЗОНА 1", small, pale, new(x, DayHeaderTop + 42, DayWidth / 2, 28));
@@ -246,16 +258,10 @@ namespace LP_PopovD_App
                                 y + 5, DayWidth / 2 - 8, RowHeight - 10);
                             TrainingBooking? booking = At(monday.AddDays(day), slot, 1 << zone);
                             bool past = Started(monday.AddDays(day), slot);
-                            bool chosen = day == selectedDay && slot == selectedSlot && (selectedZones & (1 << zone)) != 0;
                             using GraphicsPath pill = Rounded(cell, 6);
                             using SolidBrush fill = new(booking != null ? Color.FromArgb(74, 132, 57, 70)
                                 : past ? Color.FromArgb(28, 90, 113, 135) : Color.FromArgb(38, 41, 156, 145));
                             g.FillPath(fill, pill);
-                            if (chosen)
-                            {
-                                using Pen choice = new(Color.FromArgb(215, 126, 218, 255), Focused ? 2 : 1.25f);
-                                g.DrawPath(choice, pill);
-                            }
                             Label(g, booking != null ? "ЗАНЯТО" : past ? "ПРОШЛО" : dataError.Length > 0 ? "ОШИБКА" : "СВОБОДНО",
                                 small, booking != null ? busyInk : past || dataError.Length > 0 ? muted : freeInk, cell);
                         }
@@ -265,6 +271,86 @@ namespace LP_PopovD_App
                     g.DrawLine(grid, DaysLeft + day * DayWidth, DayHeaderTop,
                         DaysLeft + day * DayWidth, RowTop + TrainingSchedule.Slots.Count * RowHeight);
 
+
+            }
+            finally { g.Restore(saved); }
+        }
+
+
+        // Выделение зон не требует заново сглаживать всю таблицу.
+        private void DrawSelection(Graphics g, Rectangle clip)
+        {
+            GraphicsState state = g.Save();
+            try
+            {
+                g.ScaleTransform(Width / LogicalWidth, Height / LogicalHeight);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using Pen accent = new(Color.FromArgb(215, 126, 218, 255), Focused ? 2.1f : 1.35f);
+                using GraphicsPath day = Rounded(new RectangleF(
+                    DaysLeft + selectedDay * DayWidth + 3, DayHeaderTop + 2,
+                    DayWidth - 6, RowTop - DayHeaderTop - 4), 7);
+                g.DrawPath(accent, day);
+                for (int zone = 0; zone < 2; zone++)
+                {
+                    if ((selectedZones & (1 << zone)) == 0) continue;
+                    RectangleF cell = new(DaysLeft + selectedDay * DayWidth +
+                        zone * DayWidth / 2 + 4, RowTop + selectedSlot * RowHeight + 5,
+                        DayWidth / 2 - 8, RowHeight - 10);
+                    using GraphicsPath pill = Rounded(cell, 6);
+                    g.DrawPath(accent, pill);
+                }
+            }
+            finally { g.Restore(state); }
+            int top = Math.Clamp((int)MathF.Floor(773f * Height / LogicalHeight), 0, Height);
+            Rectangle footerArea = new(0, top, Width, Height - top);
+            if (footerArea.Width == 0 || footerArea.Height == 0 || !clip.IntersectsWith(footerArea)) return;
+            footerCache ??= CreateFooterCache(footerArea);
+            g.InterpolationMode = InterpolationMode.NearestNeighbor;
+            g.PixelOffsetMode = PixelOffsetMode.None;
+            g.DrawImage(footerCache, footerArea, 0, 0, footerCache.Width,
+                footerCache.Height, GraphicsUnit.Pixel);
+        }
+
+        private Bitmap CreateFooterCache(Rectangle bounds)
+        {
+            float samples = Math.Max(1f, Math.Min(2f,
+                Math.Min(5120f / Math.Max(1, Width), 2880f / Math.Max(1, Height))));
+            int highWidth = Math.Max(1, (int)MathF.Ceiling(bounds.Width * samples));
+            int highHeight = Math.Max(1, (int)MathF.Ceiling(bounds.Height * samples));
+            using Bitmap high = new(highWidth, highHeight, PixelFormat.Format32bppPArgb);
+            high.SetResolution(96, 96);
+            using (Graphics g = Graphics.FromImage(high))
+            {
+                float sx = highWidth / LogicalWidth;
+                float sy = highHeight * Height / (bounds.Height * LogicalHeight);
+                using Matrix transform = new(sx, 0, 0, sy, 0, -bounds.Top * highHeight / (float)bounds.Height);
+                g.Transform = transform;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                DrawFooterContents(g);
+            }
+            Bitmap result = new(bounds.Width, bounds.Height, PixelFormat.Format32bppPArgb);
+            result.SetResolution(96, 96);
+            using (Graphics g = Graphics.FromImage(result))
+            {
+                g.CompositingMode = CompositingMode.SourceCopy;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.DrawImage(high, new Rectangle(Point.Empty, result.Size),
+                    0, 0, highWidth, highHeight, GraphicsUnit.Pixel);
+            }
+            return result;
+        }
+
+        private void DrawFooterContents(Graphics g)
+        {
+            using Font medium = new(RinkTypography.FamilyName, 20, FontStyle.Bold, GraphicsUnit.Pixel);
+            using Font normal = new(RinkTypography.FamilyName, 16, FontStyle.Regular, GraphicsUnit.Pixel);
+            using Font small = new(RinkTypography.FamilyName, 13, FontStyle.Bold, GraphicsUnit.Pixel);
+            using SolidBrush white = new(Color.FromArgb(244, 251, 255));
+            using SolidBrush pale = new(Color.FromArgb(176, 214, 235));
+            using SolidBrush muted = new(Color.FromArgb(119, 161, 186));
+            using SolidBrush busyInk = new(Color.FromArgb(255, 180, 174));
                 Label(g, SelectedDate.ToString("dddd, dd MMMM", russian).ToUpper(russian) +
                     "  ·  " + TrainingSchedule.Slots[selectedSlot].Label, medium, white,
                     new(52, 778, bookingEnabled ? 700 : 1490, 34), StringAlignment.Near);
@@ -279,10 +365,9 @@ namespace LP_PopovD_App
                         medium, available || SelectedBooking != null ? white : muted, false, available);
                 }
                 Label(g, dataError.Length > 0 ? dataError : message.Length > 0 ? message :
-                    "ЛОКАЛЬНЫЙ ЖУРНАЛ: БРОНИ СОХРАНЯЮТСЯ НА ЭТОМ УСТРОЙСТВЕ.",
+                    bookingEnabled ? "ЛОКАЛЬНЫЙ ЖУРНАЛ: БРОНИ СОХРАНЯЮТСЯ НА ЭТОМ УСТРОЙСТВЕ." :
+                    "ТОЛЬКО ПРОСМОТР. ДАННЫЕ О ЗАНЯТОСТИ — ЛОКАЛЬНЫЕ.",
                     normal, dataError.Length > 0 ? busyInk : pale, new(52, 861, 1490, 27), StringAlignment.Near);
-            }
-            finally { g.Restore(saved); }
         }
 
         private static void ActionButton(Graphics g, RectangleF r, string text, Font font, Brush ink,
@@ -351,6 +436,9 @@ namespace LP_PopovD_App
             if (e.Button != MouseButtons.Left) return;
             Focus();
             PointF p = Logical(e.Location);
+            DateTime oldMonday = monday;
+            int oldDay = selectedDay, oldSlot = selectedSlot, oldZones = selectedZones;
+            string oldMessage = message;
             message = "";
             if (PreviousWeek.Contains(p)) monday = monday.AddDays(-7);
             else if (NextWeek.Contains(p)) monday = monday.AddDays(7);
@@ -365,7 +453,9 @@ namespace LP_PopovD_App
             }
             else if (bookingEnabled && BookButton.Contains(p)) ActivateBooking();
             else if (bookingEnabled) for (int i = 0; i < ZoneChoices.Length; i++) if (ZoneChoices[i].Contains(p)) selectedZones = i + 1;
-            ContentChanged();
+            if (monday != oldMonday) ContentChanged();
+            else if (selectedDay != oldDay || selectedSlot != oldSlot ||
+                selectedZones != oldZones || oldMessage != message) SelectionChanged();
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
@@ -381,7 +471,7 @@ namespace LP_PopovD_App
                 TrainingBooking? booking = At(monday.AddDays(day), slot, zone);
                 help = $"{monday.AddDays(day):dd.MM} · {TrainingSchedule.Slots[slot].Label} · Зона {(zone == 1 ? 1 : 2)}\n" +
                     (dataError.Length > 0 ? "Данные о занятости недоступны" : booking == null ? Started(monday.AddDays(day), slot)
-                        ? "Сеанс уже начался или завершён" : "Свободна в локальном журнале" : "Занята: " + booking.Tenant);
+                        ? "Сеанс уже начался или завершён" : "Свободна в локальном журнале" : bookingEnabled ? "Занята: " + booking.Tenant : "Занята");
             }
             if (tip.GetToolTip(this) != help) tip.SetToolTip(this, help);
             RectangleF oldHot = HotArea(hover), nextHot = HotArea(p);
@@ -397,6 +487,9 @@ namespace LP_PopovD_App
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
+            DateTime oldMonday = monday;
+            int oldDay = selectedDay, oldSlot = selectedSlot, oldZones = selectedZones;
+            string oldMessage = message;
             switch (e.KeyCode)
             {
                 case Keys.Left: if (selectedDay-- == 0) { selectedDay = 6; monday = monday.AddDays(-7); } break;
@@ -412,7 +505,9 @@ namespace LP_PopovD_App
                 default: return;
             }
             e.Handled = e.SuppressKeyPress = true;
-            ContentChanged();
+            if (monday != oldMonday || e.KeyCode == Keys.F5) ContentChanged();
+            else if (selectedDay != oldDay || selectedSlot != oldSlot ||
+                selectedZones != oldZones || oldMessage != message) SelectionChanged();
         }
         private RectangleF HotArea(PointF point)
         {
@@ -442,9 +537,9 @@ namespace LP_PopovD_App
             g.DrawPath(edge, path);
             g.Restore(saved);
         }
-        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); ContentChanged(); }
-        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); ContentChanged(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
         protected override void Dispose(bool disposing)
-        { if (disposing) { tip.Dispose(); contentCache?.Dispose(); } base.Dispose(disposing); }
+        { if (disposing) { tip.Dispose(); contentCache?.Dispose(); footerCache?.Dispose(); } base.Dispose(disposing); }
     }
 }
