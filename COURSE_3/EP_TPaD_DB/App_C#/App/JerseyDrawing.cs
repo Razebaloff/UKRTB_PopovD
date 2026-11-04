@@ -20,7 +20,7 @@ namespace LP_PopovD_App
                 : new[] { new RectangleF(560, 310, 480, 64), new RectangleF(560, 406, 480, 64),
                     new RectangleF(560, 502, 480, 64) }
             : codeRequested
-                ? new[] { new RectangleF(560, 330, 480, 64), new RectangleF(560, 418, 480, 64), new RectangleF(560, 506, 480, 64) }
+                ? new[] { new RectangleF(560, 302, 480, 64), new RectangleF(560, 390, 480, 64), new RectangleF(560, 478, 480, 64) }
                 : new[] { new RectangleF(560, 330, 480, 64), new RectangleF(560, 418, 480, 64) };
 
         internal static GraphicsPath Capsule(RectangleF r)

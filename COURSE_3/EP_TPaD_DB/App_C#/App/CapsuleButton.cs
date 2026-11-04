@@ -66,6 +66,15 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
+            // Окно кнопки имеет ту же овальную форму, что и отрисовка.
+            // Углы не закрашивают фон расположенного под ней расписания.
+            if (Width > 2 && Height > 2)
+            {
+                using GraphicsPath shape = JerseyDrawing.Capsule(new RectangleF(0, 0, Width, Height));
+                Region? previous = Region;
+                Region = new Region(shape);
+                previous?.Dispose();
+            }
             frostSpecks = null;
             crackLayer?.Dispose();
             crackLayer = null;

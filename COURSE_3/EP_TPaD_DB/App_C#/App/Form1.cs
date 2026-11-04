@@ -23,6 +23,7 @@ namespace LP_PopovD_App
         private readonly HockeyAccountService accounts = new();
         private readonly RememberedLoginStore preferences = new();
         private LoginSuccessDrawing? loginSuccess;
+        private VerificationRevealDrawing? verificationReveal;
         private Button? feedbackSource;
         private readonly CapsuleInput loginInput, passwordInput, emailInput, codeInput;
         private readonly RememberCheckBox rememberCheck;
@@ -36,7 +37,7 @@ namespace LP_PopovD_App
         // Регистрация устанавливает его после записи аккаунта в SQLite.
         internal string? AuthenticatedLogin => authenticatedLogin;
 
-        private bool Busy => loading || preparingAction || stickAnimation.Active || transitionFrom != null || loginSuccess != null;
+        private bool Busy => loading || preparingAction || stickAnimation.Active || transitionFrom != null || loginSuccess != null || verificationReveal != null;
         private SceneSurfaceKey CurrentKey => new(screen,
             screen == AppScreen.Login ? loginFlow.CodeRequested :
             screen == AppScreen.Registration && accounts.RegistrationCodeRequested);
@@ -50,9 +51,10 @@ namespace LP_PopovD_App
             transitionTimer = new System.Windows.Forms.Timer(components!) { Interval = 15 };
             transitionTimer.Tick += (_, _) =>
             {
-                int duration = revealOnly ? TransitionDrawing.RevealMilliseconds : TransitionDrawing.DurationMilliseconds;
+                int duration = verificationReveal != null ? VerificationRevealDrawing.DurationMilliseconds
+                    : revealOnly ? TransitionDrawing.RevealMilliseconds : TransitionDrawing.DurationMilliseconds;
                 if (transitionClock.IsRunning && transitionClock.ElapsedMilliseconds >= duration) FinishTransition();
-                else if (revealOnly) Invalidate(ToPixels(new RectangleF(495, 495, 610, 220)));
+                else if (verificationReveal == null && revealOnly) Invalidate(ToPixels(new RectangleF(495, 495, 610, 220)));
                 else Invalidate();
             };
             stickTimer = new System.Windows.Forms.Timer(components!) { Interval = 15 };
@@ -69,7 +71,7 @@ namespace LP_PopovD_App
                     Update();
                     action?.Invoke();
                 }
-                else Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize));
+                else Invalidate(StickFeedbackDrawing.PixelBounds(ClientSize, screen == AppScreen.Schedule));
             };
             successTimer = new System.Windows.Forms.Timer(components!) { Interval = 15 };
             successTimer.Tick += (_, _) =>
@@ -170,6 +172,11 @@ namespace LP_PopovD_App
                 RefreshInputFabric();
                 ShowScreenControls();
                 if (screen == AppScreen.Entry) entryButton.Focus();
+                else if (focusCodeAfterTransition && codeInput.Visible)
+                {
+                    codeInput.FocusInput();
+                    focusCodeAfterTransition = false;
+                }
                 Invalidate(true);
                 _ = WarmScenesAsync(cache);
             }
@@ -209,6 +216,13 @@ namespace LP_PopovD_App
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
+            if (verificationReveal != null)
+            {
+                bool first = !transitionClock.IsRunning;
+                if (first) transitionClock.Restart();
+                verificationReveal.Draw(e.Graphics, first ? 0 : (float)transitionClock.Elapsed.TotalMilliseconds);
+                return;
+            }
             if (transitionFrom != null && transitionTo != null)
             {
                 bool first = !transitionClock.IsRunning;
@@ -229,7 +243,7 @@ namespace LP_PopovD_App
                 e.Graphics.DrawImage(stickBackdrop, ClientRectangle, 0, 0,
                     stickBackdrop.Width, stickBackdrop.Height, GraphicsUnit.Pixel);
                 StickFeedbackDrawing.Draw(e.Graphics, ClientSize, stickAnimation.Progress(stickClock.ElapsedMilliseconds),
-                    fadeAtEnd: screen == AppScreen.Menu);
+                    fadeAtEnd: screen is AppScreen.Menu or AppScreen.Schedule, schedule: screen == AppScreen.Schedule);
                 return;
             }
             PaintScene(e.Graphics, ClientRectangle);
@@ -254,22 +268,25 @@ namespace LP_PopovD_App
             {
                 AppScreen? target = button == entryButton ? AppScreen.Login :
                     button == registrationButton ? AppScreen.Registration :
-                    button == entryScheduleButton || button == scheduleButton ? AppScreen.Schedule :
+                    button == entryScheduleButton || button == scheduleButton || button == rentButton ? AppScreen.Schedule :
                     button == backButton ? (screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry) : null;
                 if (target.HasValue) await cache.GetAsync(new(target.Value));
                 if (button == submitButton && screen == AppScreen.Login)
                 {
                     await cache.GetAsync(new(AppScreen.Login, true));
+                    await cache.GetAsync(new(AppScreen.Login, true, true));
                     if (loginFlow.CodeRequested)
                     {
-                        await cache.GetAsync(new(AppScreen.Login, true, true));
                         await cache.GetAsync(new(AppScreen.Menu));
                     }
                 }
                 if (button == submitButton && screen == AppScreen.Registration)
                 {
                     if (!accounts.RegistrationCodeRequested)
+                    {
                         await cache.GetAsync(new(AppScreen.Registration, true));
+                        await cache.GetAsync(new(AppScreen.Registration, true, true));
+                    }
                     else
                     {
                         await cache.GetAsync(new(AppScreen.Registration, true, true));
@@ -330,7 +347,7 @@ namespace LP_PopovD_App
             graphics.TranslateTransform(-sourceBounds.X, -sourceBounds.Y);
             // Для небольших кнопок вдали от заголовка не перерисовываем
             // клюшки: фоновая сцена берётся из готового bitmap-кэша.
-            if (screen != AppScreen.Menu && !withoutSticks &&
+            if (screen is not (AppScreen.Menu or AppScreen.Schedule) && !withoutSticks &&
                 sourceBounds.IntersectsWith(StickFeedbackDrawing.PixelBounds(ClientSize)))
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
@@ -360,6 +377,7 @@ namespace LP_PopovD_App
             transitionFrom?.Dispose(); transitionTo?.Dispose(); transitionFrom = transitionTo = null;
             stickBackdrop?.Dispose(); stickBackdrop = null;
             loginSuccess?.Dispose(); loginSuccess = null;
+            verificationReveal?.Dispose(); verificationReveal = null;
             stickAnimation.Cancel(); stickClock.Stop();
             StickFeedbackDrawing.Dispose();
         }
@@ -430,7 +448,7 @@ namespace LP_PopovD_App
 
         private void ShowScreenControls(bool forCapture = false)
         {
-            if (!forCapture && (loading || stickAnimation.Active || transitionFrom != null || loginSuccess != null))
+            if (!forCapture && (loading || stickAnimation.Active || transitionFrom != null || loginSuccess != null || verificationReveal != null))
             { HideScreenControls(); return; }
             bool entry = screen == AppScreen.Entry, menu = screen == AppScreen.Menu;
             bool schedule = screen == AppScreen.Schedule;
@@ -635,7 +653,10 @@ namespace LP_PopovD_App
                 accounts.Reset();
                 authStatus = "";
                 if (target == AppScreen.Schedule && screen != AppScreen.Schedule)
+                {
                     scheduleReturnScreen = screen;
+                    if (!string.IsNullOrWhiteSpace(authenticatedLogin)) scheduleBoard.SuggestedTenant = authenticatedLogin;
+                }
                 screen = target;
                 if (target == AppScreen.Entry)
                     authenticatedLogin = null;
@@ -664,6 +685,7 @@ namespace LP_PopovD_App
         {
             if (transitionTimer == null) return;
             transitionTimer.Stop(); transitionClock.Reset();
+            verificationReveal?.Dispose(); verificationReveal = null;
             transitionRenderer?.Dispose(); transitionRenderer = null;
             transitionFrom?.Dispose(); transitionTo?.Dispose(); transitionFrom = transitionTo = null;
         }
@@ -750,22 +772,14 @@ namespace LP_PopovD_App
                         // Демо: открываем поле после проверки данных, но не
                         // отправляем письмо. SQLite при этом остаётся реальной.
                         Bitmap? next = await cache.GetAsync(new(AppScreen.Registration, true));
-                        if (next == null || cache != surfaces || IsDisposed || Disposing) return;
+                        Bitmap? cleanSurface = await cache.GetAsync(new(AppScreen.Registration, true, true));
+                        if (next == null || cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
                         authStatus = "Демо: открываем поле кода без отправки письма.";
                         Invalidate(true);
                         await accounts.RequestRegistrationAsync(
                             loginInput.Value.Trim(), passwordInput.Value, emailInput.Value.Trim());
-                        Bitmap before = CaptureScreen();
-                        sceneCache = next;
                         authStatus = "Письмо не отправляется. Введите любой код.";
-                        LayoutSceneControls();
-                        RefreshInputFabric();
-                        ShowScreenControls(forCapture: true);
-                        Bitmap after = CaptureScreen();
-                        focusCodeAfterTransition = true;
-                        // В регистрации меняются позиции всех полей, а не
-                        // только нижняя область — нужен полный переход.
-                        BeginTransition(before, after, Center(submitButton));
+                        BeginVerificationReveal(next, cleanSurface, registration: true);
                     }
                     else if (string.IsNullOrWhiteSpace(codeInput.Value))
                     {
@@ -792,28 +806,20 @@ namespace LP_PopovD_App
                 else if (!loginFlow.CodeRequested)
                 {
                     Bitmap? next = await cache.GetAsync(new(AppScreen.Login, true));
-                    if (next == null || cache != surfaces || IsDisposed || Disposing) return;
-                    authStatus = "Проверяем логин и пароль в базе данных…";
+                    Bitmap? cleanSurface = await cache.GetAsync(new(AppScreen.Login, true, true));
+                    if (next == null || cleanSurface == null || cache != surfaces || IsDisposed || Disposing) return;
+                    authStatus = HockeyAccountService.DemoVerificationEnabled
+                        ? "Открываем поле демонстрационного кода…" : "Проверяем логин и пароль…";
                     Invalidate(true);
-                    // Нельзя войти по произвольному логину/паролю.
-                    // Идентификационные данные сверяются с SQLite,
-                    // а поле кода в деморежиме принимает любое непустое значение.
                     // Деморежим входа: принимаем любые непустые логин и
                     // пароль, даже если их нет в базе пользователей.
                     if (HockeyAccountService.DemoVerificationEnabled)
                         await accounts.RequestDemoLoginAsync(loginInput.Value.Trim());
                     else
                         await accounts.RequestLoginAsync(loginInput.Value.Trim(), passwordInput.Value);
-                    Bitmap before = CaptureScreen();
                     loginFlow.RequestCode();
                     authStatus = "Демо: письмо не отправляется. Введите любой код.";
-                    sceneCache = next;
-                    LayoutSceneControls();
-                    RefreshInputFabric();
-                    ShowScreenControls(forCapture: true);
-                    Bitmap after = CaptureScreen();
-                    focusCodeAfterTransition = true;
-                    BeginTransition(before, after, Center(submitButton), soft: true);
+                    BeginVerificationReveal(next, cleanSurface, registration: false);
                 }
                 else if (string.IsNullOrWhiteSpace(codeInput.Value))
                 {
@@ -1002,7 +1008,7 @@ namespace LP_PopovD_App
                     if (successFromRegistration) CompleteLoginAnimation();
                     else { CancelLoginAnimation(); ShowScreenControls(); codeInput.FocusInput(); Invalidate(true); }
                 }
-                else if (transitionFrom != null) FinishTransition();
+                else if (transitionFrom != null || verificationReveal != null) FinishTransition();
                 else if (screen != AppScreen.Entry)
                     _ = NavigateAsync(screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry,
                         Center(backButton));
@@ -1116,4 +1122,3 @@ namespace LP_PopovD_App
         }
     }
 }
-

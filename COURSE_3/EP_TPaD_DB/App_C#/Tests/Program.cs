@@ -1,6 +1,7 @@
 using LP_PopovD_App;
 
 int checks = 0;
+checks += BookingChecks.Run();
 void Check(bool value, string message)
 {
     if (!value) throw new InvalidOperationException(message);

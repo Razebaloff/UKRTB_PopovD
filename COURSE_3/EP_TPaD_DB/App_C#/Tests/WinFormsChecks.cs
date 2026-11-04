@@ -33,6 +33,9 @@ internal static class WinFormsChecks
                         : Activator.CreateInstance(type, nonPublic: true);
                 using Control control = (Control)instance!;
                 control.Bounds = kind == "RememberCheckBox" ? new Rectangle(0, 0, 359, 30) : new Rectangle(0, 0, 480, 64);
+                if (kind == "CapsuleButton" && (control.Region == null ||
+                    control.Region.IsVisible(0, 0) || !control.Region.IsVisible(240, 32)))
+                    throw new InvalidOperationException("Овальная кнопка содержит прямоугольные углы.");
                 control.Text = kind == "CapsuleButton" ? "ВОЙТИ" : control.Text;
                 host.Controls.Add(control);
                 host.CreateControl();
@@ -65,6 +68,7 @@ internal static class WinFormsChecks
                 host.Controls.Remove(control);
             }
             checks += ButtonDpiChecks.Run();
+            checks += VerificationRevealChecks.Run();
             if (drawingExceptions != 0)
                 throw new InvalidOperationException("Исключения отрисовки: " + drawingExceptions);
             Console.WriteLine($"Passed: {checks} native WinForms paint cycles; drawing exceptions: 0.");

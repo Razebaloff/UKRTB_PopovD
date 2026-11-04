@@ -21,7 +21,8 @@ namespace LP_PopovD_App
         private readonly PointF[] glyphPoints;
         private readonly float spriteScale, nameScale;
         private readonly RectangleF letterBounds;
-        private readonly PointF initial = new(800, 362), landed = new(800, 460);
+        private readonly PointF initial;
+        private readonly PointF landed = new(800, 460);
         private readonly RectangleF[] fields;
 
         // Единая анимация для успешного ВХОДА и завершения РЕГИСТРАЦИИ:
@@ -64,6 +65,8 @@ namespace LP_PopovD_App
             path.Flatten(null, .7f);
             glyphPoints = path.PathPoints;
             fields = JerseyDrawing.InputBounds(registration, true);
+            initial = new PointF(fields[0].X + fields[0].Width / 2,
+                fields[0].Y + fields[0].Height / 2);
             foreach (RectangleF field in fields) AddPanel(field);
             AddPanel(registration ? JerseyDrawing.SubmitBounds : JerseyDrawing.LoginSubmitBounds);
             if (!registration) AddPanel(JerseyDrawing.RememberBounds);

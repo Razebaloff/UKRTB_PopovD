@@ -6,11 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="SceneCacheChecks.cs;WinFormsChecks.cs;AccountChecks.cs" />
+    <Compile Remove="SceneCacheChecks.cs;WinFormsChecks.cs;AccountChecks.cs;ButtonDpiChecks.cs;VerificationRevealChecks.cs" />
     <Compile Include="../App/AuthInputRules.cs" Link="AuthInputRules.cs" />
     <Compile Include="../App/LoginFlowState.cs" Link="LoginFlowState.cs" />
     <Compile Include="../App/RememberedLoginStore.cs" Link="RememberedLoginStore.cs" />
     <Compile Include="../App/StickAnimationState.cs" Link="StickAnimationState.cs" />
     <Compile Include="../App/TrainingSchedule.cs" Link="TrainingSchedule.cs" />
+    <Compile Include="../App/TrainingBookingStore.cs" Link="TrainingBookingStore.cs" />
   </ItemGroup>
 </Project>
