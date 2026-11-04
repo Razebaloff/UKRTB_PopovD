@@ -109,7 +109,10 @@ namespace LP_PopovD_App
                 DrawCaptionOnTop(type, pressed);
                 captionKey = labelKey;
             }
-            g.DrawImageUnscaled(captionLayer, 0, 0);
+            // Слой уже рассчитан в пикселях ClientSize. DrawImageUnscaled
+            // повторно увеличивает bitmap 96 DPI на мониторах 120/144/192 DPI.
+            g.DrawImage(captionLayer, ClientRectangle, 0, 0,
+                captionLayer.Width, captionLayer.Height, GraphicsUnit.Pixel);
             // Клавиатурный фокус обозначается подсветкой фактуры в
             // DrawButton, без белого пунктирного кольца вокруг шайбы.
         }

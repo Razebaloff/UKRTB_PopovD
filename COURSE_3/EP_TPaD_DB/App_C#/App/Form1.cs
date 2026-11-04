@@ -226,7 +226,8 @@ namespace LP_PopovD_App
             }
             if (stickAnimation.Active && stickBackdrop != null)
             {
-                e.Graphics.DrawImageUnscaled(stickBackdrop, 0, 0);
+                e.Graphics.DrawImage(stickBackdrop, ClientRectangle, 0, 0,
+                    stickBackdrop.Width, stickBackdrop.Height, GraphicsUnit.Pixel);
                 StickFeedbackDrawing.Draw(e.Graphics, ClientSize, stickAnimation.Progress(stickClock.ElapsedMilliseconds),
                     fadeAtEnd: screen == AppScreen.Menu);
                 return;
@@ -581,7 +582,8 @@ namespace LP_PopovD_App
                 try
                 {
                     control.DrawToBitmap(tile, new Rectangle(Point.Empty, control.Size));
-                    g.DrawImageUnscaled(tile, control.Left, control.Top);
+                    g.DrawImage(tile, control.Bounds, 0, 0,
+                        tile.Width, tile.Height, GraphicsUnit.Pixel);
                 }
                 catch (Exception error) when (error is ExternalException or ArgumentException or NotSupportedException)
                 {

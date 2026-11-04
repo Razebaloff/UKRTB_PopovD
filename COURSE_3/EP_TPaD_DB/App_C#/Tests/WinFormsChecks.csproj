@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="WinFormsChecks.cs" />
+    <Compile Include="ButtonDpiChecks.cs" />
     <ProjectReference Include="../App/LP_PopovD_App.csproj" />
   </ItemGroup>
 </Project>

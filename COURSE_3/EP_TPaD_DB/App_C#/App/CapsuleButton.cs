@@ -137,7 +137,10 @@ namespace LP_PopovD_App
                 else label.DrawString(Text, Font, ink, ClientRectangle, center);
                 captionKey = labelKey;
             }
-            g.DrawImageUnscaled(captionLayer, 0, 0);
+            // Размер надписи уже учитывает масштаб сцены: переносим
+            // пиксели без повторного пересчёта по DPI монитора.
+            g.DrawImage(captionLayer, ClientRectangle, 0, 0,
+                captionLayer.Width, captionLayer.Height, GraphicsUnit.Pixel);
             // Фокус выделяется небольшим изменением цвета самой кнопки.
             // Отдельная белая контурная линия не создаётся.
         }

@@ -281,7 +281,9 @@ namespace LP_PopovD_App
             {
                 g.CompositingMode = CompositingMode.SourceCopy;
                 // Статичная ткань остаётся в нативном разрешении, а динамика — в лёгком буфере.
-                g.DrawImageUnscaled(milliseconds <= 0 ? before : clean, 0, 0);
+                Bitmap background = milliseconds <= 0 ? before : clean;
+                g.DrawImage(background, new Rectangle(Point.Empty, displaySize), 0, 0,
+                    background.Width, background.Height, GraphicsUnit.Pixel);
                 if (milliseconds <= 0) return;
                 overlayGraphics.CompositingMode = CompositingMode.SourceCopy;
                 overlayGraphics.Clear(Color.Transparent);
