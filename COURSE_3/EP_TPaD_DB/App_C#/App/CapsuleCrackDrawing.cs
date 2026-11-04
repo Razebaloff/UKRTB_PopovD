@@ -9,7 +9,7 @@ namespace LP_PopovD_App
     {
         internal static Rectangle Bounds(Rectangle capsule)
         {
-            int margin = Math.Max(12, (int)(capsule.Height * .65f));
+            int margin = Math.Max(12, (int)(capsule.Height * .95f));
             return Rectangle.Inflate(capsule, margin, margin);
         }
 
@@ -30,50 +30,57 @@ namespace LP_PopovD_App
             float rad = size.Height / 2f;
             float longPart = Math.Max(0, size.Width - size.Height);
 
-            using Pen shadow = new(Color.FromArgb(163, 33, 87, 111), 1.6f)
+            float scale = Math.Max(.75f, size.Height / 52f);
+            using Pen shadow = new(Color.FromArgb(226, 18, 55, 78), 2)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+            using Pen highlight = new(Color.FromArgb(244, 242, 253, 255), .9f)
                 { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen highlight = new(Color.FromArgb(205, 237, 250, 255), .85f)
+            using Pen soft = new(Color.FromArgb(35, 143, 211, 235), 5)
                 { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            for (int i = 0; i < 25; i++)
+            for (int i = 0; i < 31; i++)
             {
-                // Семена трещин распределены и по прямым длинным краям,
-                // и по закруглённым концам капсулы.
-                float t = random.NextSingle();
                 float x, y, nx, ny;
                 if (i % 3 == 0)
                 {
                     bool left = random.Next(2) == 0;
-                    float a = -MathF.PI / 2 + random.NextSingle() * MathF.PI;
-                    nx = (left ? -1 : 1) * MathF.Cos(a);
-                    ny = MathF.Sin(a);
+                    float angle = -MathF.PI / 2 + random.NextSingle() * MathF.PI;
+                    nx = (left ? -1 : 1) * MathF.Cos(angle); ny = MathF.Sin(angle);
                     x = offset + (left ? rad : rad + longPart) + nx * rad;
                     y = cy + ny * rad;
                 }
                 else
                 {
                     bool top = random.Next(2) == 0;
-                    x = offset + rad + t * longPart;
+                    x = offset + rad + random.NextSingle() * longPart;
                     y = cy + (top ? -rad : rad);
-                    nx = (random.NextSingle() - .5f) * .30f;
-                    ny = top ? -1 : 1;
+                    nx = (random.NextSingle() - .5f) * .45f; ny = top ? -1 : 1;
                 }
-                float tangentX = -ny, tangentY = nx;
-                float distance = rad * (.20f + random.NextSingle() * .38f);
-                PointF p0 = new(x, y);
-                PointF p1 = new(x + nx * distance * .45f + tangentX * distance * .10f,
-                    y + ny * distance * .45f + tangentY * distance * .10f);
-                PointF p2 = new(x + nx * distance + tangentX * (random.NextSingle() - .5f) * distance * .32f,
-                    y + ny * distance + tangentY * (random.NextSingle() - .5f) * distance * .32f);
-                shadow.Width = .8f + random.NextSingle() * 1.2f;
-                g.DrawLines(shadow, new[] { p0, p1, p2 });
-                g.DrawLine(highlight, p0.X + .6f, p0.Y - .5f, p1.X + .6f, p1.Y - .5f);
-                if (i % 2 == 0)
+                float tx = -ny, ty = nx, length = rad * (.55f + random.NextSingle() * .88f);
+                PointF[] nodes = new PointF[6];
+                for (int j = 0; j < nodes.Length; j++)
                 {
-                    float direction = random.Next(2) == 0 ? -1 : 1;
-                    PointF branch = new(p1.X + tangentX * distance * .35f * direction + nx * distance * .20f,
-                        p1.Y + tangentY * distance * .35f * direction + ny * distance * .20f);
-                    g.DrawLine(highlight, p1, branch);
+                    float t = j / 5f, bend = j == 0 ? 0 : (random.NextSingle() - .5f) * length * .29f;
+                    nodes[j] = new(x + nx * length * t + tx * bend, y + ny * length * t + ty * bend);
                 }
+                float width = (1.7f + random.NextSingle() * 1.2f) * scale;
+                for (int j = 0; j < nodes.Length - 1; j++)
+                {
+                    shadow.Width = width * (1 - .15f * j);
+                    highlight.Width = Math.Max(.5f * scale, shadow.Width * .42f);
+                    soft.Width = shadow.Width * 2;
+                    g.DrawLine(soft, nodes[j], nodes[j + 1]);
+                    g.DrawLine(shadow, nodes[j], nodes[j + 1]);
+                    g.DrawLine(highlight, nodes[j].X + .65f * scale, nodes[j].Y - .7f * scale,
+                        nodes[j + 1].X + .65f * scale, nodes[j + 1].Y - .7f * scale);
+                }
+                PointF origin = nodes[1 + random.Next(3)];
+                float side = random.Next(2) == 0 ? -1 : 1;
+                PointF end = new(origin.X + nx * length * .26f + tx * length * .35f * side,
+                    origin.Y + ny * length * .26f + ty * length * .35f * side);
+                shadow.Width = .9f * scale;
+                g.DrawLine(shadow, origin, end);
+                g.DrawLine(highlight, origin.X + .6f * scale, origin.Y - .6f * scale,
+                    end.X + .6f * scale, end.Y - .6f * scale);
             }
             return layer;
         }
@@ -87,7 +94,7 @@ namespace LP_PopovD_App
             // Сначала трещины короткие; затем постепенно расходятся
             // наружу от периметра капсулы.
             using GraphicsPath reveal = new(FillMode.Alternate);
-            float outerPad = capsule.Height * (.06f + .52f * p);
+            float outerPad = capsule.Height * (.08f + .78f * p);
             using GraphicsPath outer = JerseyDrawing.Capsule(
                 RectangleF.Inflate(capsule, outerPad, outerPad));
             using GraphicsPath inner = JerseyDrawing.Capsule(

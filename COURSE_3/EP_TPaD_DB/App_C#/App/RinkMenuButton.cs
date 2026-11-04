@@ -10,6 +10,7 @@ namespace LP_PopovD_App
         private Bitmap? buttonLayer, captionLayer;
         private readonly FrostHoverAnimation frost;
         private FrostSpeck[]? frostSpecks;
+        private FrostSpeck[]? hoverSpecks;
         // При наведении на шайбу растут только трещины во льду ВОКРУГ,
         // не появляется голубая прозрачная плёнка на самой шайбе.
         protected virtual bool TracksHoverCracks => this is PuckButton;
@@ -33,7 +34,7 @@ namespace LP_PopovD_App
             AccessibleRole = AccessibleRole.PushButton;
             frost = new FrostHoverAnimation(() =>
             {
-                if (IsDisposed || !IsHandleCreated) return;
+                if (IsDisposed || !IsHandleCreated || FindForm()?.WindowState == FormWindowState.Minimized) return;
                 Invalidate();
                 OnFrostFrame();
             }, this is PuckButton ? 900 : 285);
@@ -44,6 +45,7 @@ namespace LP_PopovD_App
         {
             base.OnResize(e);
             frostSpecks = null;
+            hoverSpecks = null;
             if (Width < 2 || Height < 2)
                 return;
             using GraphicsPath shape = new();
@@ -93,6 +95,14 @@ namespace LP_PopovD_App
             if (ambient > .015f)
                 FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
                     FrostHoverAnimation.Seconds, ambient, true);
+            if (TracksHoverCracks && frost.Amount > .015f)
+            {
+                // Только тонкие растущие ветви инея. Сплошной заливки,
+                // голубой плёнки и ледяной корки здесь нет.
+                hoverSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true, 12731 + Text.Length * 93);
+                FrostDrawing.DrawSpecks(g, ClientRectangle, hoverSpecks,
+                    FrostHoverAnimation.Seconds * .72f + .81f, frost.Amount * 1.65f, true);
+            }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
             // промежуточные кадры инея используют готовый прозрачный спрайт.

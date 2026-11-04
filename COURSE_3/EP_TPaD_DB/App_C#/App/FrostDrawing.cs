@@ -11,6 +11,8 @@ namespace LP_PopovD_App
         private static readonly Stopwatch sharedTime = Stopwatch.StartNew();
         private static readonly HashSet<FrostHoverAnimation> active = new();
         private static readonly System.Windows.Forms.Timer sharedTimer = CreateTimer();
+        internal static event Action<float>? Frame;
+        private static int lastEffectFrame = -1;
         private readonly Stopwatch transition = new();
         private readonly Action invalidate;
         private readonly float transitionMilliseconds;
@@ -39,11 +41,17 @@ namespace LP_PopovD_App
                 // стоимость перерисовок. Hover остаётся на 16 мс.
                 int frame = (int)(Seconds * 45);
                 bool hovering = item.transition.IsRunning;
-                if (hovering || (item.Amount < .999f && item.lastAmbientFrame != frame))
+                if (hovering || item.lastAmbientFrame != frame)
                 {
                     item.lastAmbientFrame = frame;
                     item.invalidate();
                 }
+            }
+            int effectFrame = (int)(Seconds * 30);
+            if (effectFrame != lastEffectFrame)
+            {
+                lastEffectFrame = effectFrame;
+                Frame?.Invoke(Seconds);
             }
         }
 

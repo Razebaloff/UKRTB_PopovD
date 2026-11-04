@@ -69,6 +69,7 @@ internal static class WinFormsChecks
             }
             checks += ButtonDpiChecks.Run();
             checks += VerificationRevealChecks.Run();
+            checks += VisualFeedbackChecks.Run();
             if (drawingExceptions != 0)
                 throw new InvalidOperationException("Исключения отрисовки: " + drawingExceptions);
             Console.WriteLine($"Passed: {checks} native WinForms paint cycles; drawing exceptions: 0.");

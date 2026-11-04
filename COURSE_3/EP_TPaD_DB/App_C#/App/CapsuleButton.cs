@@ -13,6 +13,7 @@ namespace LP_PopovD_App
         private readonly bool crackOnHover;
         private Bitmap? crackLayer;
         private Size crackSize;
+        private float lastCrackAmount;
         internal float CrackAmount => crackOnHover ? frost.Amount : 0;
 
         internal void PaintCrackedIce(Graphics background)
@@ -46,10 +47,15 @@ namespace LP_PopovD_App
             AccessibleRole = AccessibleRole.PushButton;
             frost = new FrostHoverAnimation(() =>
             {
-                if (IsDisposed || !IsHandleCreated) return;
+                if (IsDisposed || !IsHandleCreated || FindForm()?.WindowState == FormWindowState.Minimized) return;
                 Invalidate();
-                if (crackOnHover && Parent != null && Visible)
-                    Parent.Invalidate(CapsuleCrackDrawing.Bounds(Bounds));
+                float amount = CrackAmount;
+                if (crackOnHover && Parent != null && Visible && Math.Abs(amount - lastCrackAmount) >= .0005f)
+                {
+                    lastCrackAmount = amount;
+                    if (Parent is Form1 form) form.InvalidateCracks(CapsuleCrackDrawing.Bounds(Bounds));
+                    else Parent.Invalidate(CapsuleCrackDrawing.Bounds(Bounds), invalidateChildren: false);
+                }
             }, crackOnHover ? 900 : 285);
             frost.SetVisible(Visible);
         }

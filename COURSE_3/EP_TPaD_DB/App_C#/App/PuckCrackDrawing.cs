@@ -9,7 +9,7 @@ namespace LP_PopovD_App
     internal static class PuckCrackDrawing
     {
         internal static int Side(Size puck)
-            => Math.Max(1, (int)MathF.Ceiling(Math.Max(puck.Width, puck.Height) * 1.55f));
+            => Math.Max(1, (int)MathF.Ceiling(Math.Max(puck.Width, puck.Height) * 1.65f));
 
         internal static Rectangle Bounds(Rectangle puck)
         {
@@ -32,67 +32,67 @@ namespace LP_PopovD_App
             float center = side / 2f;
             float rPuck = Math.Min(puck.Width, puck.Height) * .5f;
 
-            using Pen shadow = new(Color.FromArgb(155, 16, 58, 83), 2.1f)
-            { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-            using Pen glint = new(Color.FromArgb(193, 235, 250, 255), .9f)
-            { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-            using Pen feather = new(Color.FromArgb(42, 196, 240, 255), 6f)
-            { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-            using SolidBrush chip = new(Color.FromArgb(112, 241, 252, 255));
-
-            int rays = 15 + random.Next(7);
+            float scale = Math.Max(.7f, Math.Min(puck.Width, puck.Height) / 330f);
+            using Pen shadow = new(Color.FromArgb(226, 13, 48, 72), 2)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+            using Pen glint = new(Color.FromArgb(239, 244, 253, 255), 1)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+            using Pen diffuse = new(Color.FromArgb(38, 141, 207, 234), 5)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using SolidBrush chip = new(Color.FromArgb(145, 232, 247, 252));
+            int rays = 18 + random.Next(8);
             for (int i = 0; i < rays; i++)
             {
-                float a = (i + (random.NextSingle() - .5f) * .48f) * MathF.Tau / rays;
-                float r = rPuck * (.93f + random.NextSingle() * .06f);
-                float outer = rPuck * (1.18f + random.NextSingle() * .27f);
-                int sections = 3 + random.Next(3);
-                PointF[] nodes = new PointF[sections + 1];
-
-                for (int j = 0; j <= sections; j++)
+                if (i % 7 == 2) continue;
+                float angle = (i + random.NextSingle() * .85f) * MathF.Tau / rays;
+                float start = rPuck * (.97f + random.NextSingle() * .025f);
+                float end = rPuck * (1.23f + random.NextSingle() * .30f);
+                int count = 5 + random.Next(3);
+                PointF[] nodes = new PointF[count + 1];
+                for (int j = 0; j <= count; j++)
                 {
-                    float t = j / (float)sections;
-                    float rr = r + (outer - r) * t;
-                    float offset = j == 0 ? 0 : (random.NextSingle() - .5f) *
-                        (.055f + .024f * t);
-                    float angle = a + offset;
-                    nodes[j] = new PointF(center + MathF.Cos(angle) * rr,
-                        center + MathF.Sin(angle) * rr);
+                    float t = j / (float)count;
+                    float radius = start + (end - start) * t;
+                    float bend = j == 0 ? 0 : (random.NextSingle() - .5f) * .10f;
+                    nodes[j] = new(center + MathF.Cos(angle + bend) * radius,
+                        center + MathF.Sin(angle + bend) * radius);
                 }
-
-                shadow.Width = 1.0f + random.NextSingle() * 1.5f;
-                glint.Width = Math.Max(.5f, shadow.Width * .55f);
-                g.DrawLines(feather, nodes);
-                g.DrawLines(shadow, nodes);
-                PointF[] shifted = new PointF[nodes.Length];
-                for (int j = 0; j < nodes.Length; j++)
-                    shifted[j] = new PointF(nodes[j].X + .9f, nodes[j].Y - 1f);
-                g.DrawLines(glint, shifted);
-
-                // Редкие разветвления с разной длиной, неровными углами
-                // и отдельными сколами. Линии не образуют геометрическую сетку.
-                if (i % 3 != 1)
+                float width = (2.2f + random.NextSingle() * 1.5f) * scale;
+                for (int j = 0; j < count; j++)
                 {
-                    int source = 1 + random.Next(sections - 1);
-                    float sideAngle = a + (random.Next(2) == 0 ? -1 : 1) *
-                        (.34f + random.NextSingle() * .48f);
-                    float branch = rPuck * (.035f + random.NextSingle() * .12f);
-                    PointF origin = nodes[source];
-                    PointF middle = new(origin.X + MathF.Cos(sideAngle) * branch * .48f,
-                        origin.Y + MathF.Sin(sideAngle) * branch * .48f);
-                    PointF end = new(origin.X + MathF.Cos(sideAngle + .07f) * branch,
-                        origin.Y + MathF.Sin(sideAngle - .09f) * branch);
-                    shadow.Width *= .58f;
-                    glint.Width *= .65f;
-                    g.DrawLines(shadow, new[] { origin, middle, end });
-                    g.DrawLine(glint, origin.X + .7f, origin.Y - .7f,
-                        end.X + .7f, end.Y - .7f);
+                    shadow.Width = Math.Max(.55f * scale, width * (1 - .78f * j / count));
+                    glint.Width = Math.Max(.45f * scale, shadow.Width * .43f);
+                    diffuse.Width = shadow.Width * 2.1f;
+                    g.DrawLine(diffuse, nodes[j], nodes[j + 1]);
+                    g.DrawLine(shadow, nodes[j], nodes[j + 1]);
+                    g.DrawLine(glint, nodes[j].X + .8f * scale, nodes[j].Y - .8f * scale,
+                        nodes[j + 1].X + .8f * scale, nodes[j + 1].Y - .8f * scale);
+                }
+                for (int branch = 0; branch < 1 + i % 3; branch++)
+                {
+                    PointF origin = nodes[1 + random.Next(count - 1)];
+                    float direction = angle + (random.Next(2) == 0 ? -1 : 1) * (.35f + random.NextSingle() * .75f);
+                    float length = rPuck * (.04f + random.NextSingle() * .11f);
+                    PointF middle = new(origin.X + MathF.Cos(direction) * length * .54f,
+                        origin.Y + MathF.Sin(direction) * length * .54f);
+                    PointF tip = new(origin.X + MathF.Cos(direction + .12f) * length,
+                        origin.Y + MathF.Sin(direction + .12f) * length);
+                    shadow.Width = (1.1f + random.NextSingle() * .6f) * scale;
+                    glint.Width = .55f * scale;
+                    g.DrawLines(shadow, new[] { origin, middle, tip });
+                    g.DrawLine(glint, middle.X + .6f * scale, middle.Y - .6f * scale,
+                        tip.X + .6f * scale, tip.Y - .6f * scale);
+                    if (branch == 1)
+                        g.DrawLine(glint, middle, new PointF(middle.X + MathF.Cos(direction - .6f) * length * .35f,
+                            middle.Y + MathF.Sin(direction - .6f) * length * .35f));
                 }
                 if (i % 4 == 0)
                 {
-                    PointF p = nodes[^1];
-                    float size = 1.1f + random.NextSingle() * 2.8f;
-                    g.FillEllipse(chip, p.X - size, p.Y - size, size * 2, size * 2);
+                    PointF point = nodes[^2];
+                    float shard = (1.4f + random.NextSingle() * 2) * scale;
+                    g.FillPolygon(chip, new[] { new PointF(point.X - shard, point.Y),
+                        new PointF(point.X + shard * .7f, point.Y - shard * .55f),
+                        new PointF(point.X + shard * .3f, point.Y + shard) });
                 }
             }
             return result;
@@ -112,9 +112,9 @@ namespace LP_PopovD_App
             // Наружная граница растёт по радиусу — трещины визуально
             // распространяются от края шайбы в окружающий лёд.
             using GraphicsPath reveal = new() { FillMode = FillMode.Alternate };
-            float outer = puckRadius * (.99f + .46f * p);
+            float outer = puckRadius * (.99f + .60f * p);
             reveal.AddEllipse(cx - outer, cy - outer, outer * 2, outer * 2);
-            float inner = puckRadius * .94f;
+            float inner = puckRadius * .98f;
             reveal.AddEllipse(cx - inner, cy - inner, inner * 2, inner * 2);
             g.SetClip(reveal, CombineMode.Intersect);
             using ImageAttributes alpha = new();

@@ -20,14 +20,22 @@ namespace LP_PopovD_App
             DrawFlag(g, new RectangleF(632, 28, 106, 64), true);
             DrawFlag(g, new RectangleF(862, 28, 106, 64), false);
             if (includeSticks) DrawSticks(g);
-            using Font title = new(RinkTypography.FamilyName, 42, FontStyle.Bold, GraphicsUnit.Pixel);
-            using StringFormat format = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-            using SolidBrush halo = new(Color.FromArgb(200, 239, 250, 255));
+            using GraphicsPath title = CreateTitlePath();
+            using Pen halo = new(Color.FromArgb(150, 239, 250, 255), 1.2f);
             using SolidBrush ink = new(RinkDrawing.Blue);
-            RectangleF bounds = new(120, 112, 1360, 65);
-            g.DrawString("ТЕРРИТОРИЯ ХОККЕЯ", title, halo,
-                new RectangleF(bounds.X + 1, bounds.Y + 2, bounds.Width, bounds.Height), format);
-            g.DrawString("ТЕРРИТОРИЯ ХОККЕЯ", title, ink, bounds, format);
+            g.DrawPath(halo, title);
+            g.FillPath(ink, title);
+        }
+
+        internal static GraphicsPath CreateTitlePath()
+        {
+            GraphicsPath path = new();
+            using FontFamily family = new(RinkTypography.FamilyName);
+            using StringFormat format = new() { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center,
+                FormatFlags = StringFormatFlags.NoWrap };
+            path.AddString("ТЕРРИТОРИЯ ХОККЕЯ", family, (int)FontStyle.Bold, 42,
+                new RectangleF(120, 112, 1360, 65), format);
+            return path;
         }
 
         private static void DrawFlag(Graphics g, RectangleF r, bool bashkortostan)

@@ -24,6 +24,8 @@ namespace LP_PopovD_App
         private readonly RememberedLoginStore preferences = new();
         private LoginSuccessDrawing? loginSuccess;
         private VerificationRevealDrawing? verificationReveal;
+        private TitleGlowDrawing? titleGlow;
+        private bool titleGlowMenu;
         private Button? feedbackSource;
         private readonly CapsuleInput loginInput, passwordInput, emailInput, codeInput;
         private readonly RememberCheckBox rememberCheck;
@@ -89,6 +91,7 @@ namespace LP_PopovD_App
             backButton = new CapsuleButton(crackOnHover: true)
             { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
             scheduleBoard = new ScheduleBoard { TabIndex = 0 };
+            scheduleBoard.OverlayPaint += PaintScheduleCracks;
             Controls.Add(scheduleBoard);
             foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
             {
@@ -110,6 +113,7 @@ namespace LP_PopovD_App
             };
             HideScreenControls();
             LayoutSceneControls();
+            FrostHoverAnimation.Frame += AmbientEffectsFrame;
         }
 
         private static PointF Center(Control control)
@@ -255,7 +259,7 @@ namespace LP_PopovD_App
                 registrationButton.PaintCrackedIce(e.Graphics);
                 entryScheduleButton.PaintCrackedIce(e.Graphics);
             }
-            if (screen != AppScreen.Entry && !loading)
+            if (screen is not (AppScreen.Entry or AppScreen.Schedule) && !loading)
                 backButton.PaintCrackedIce(e.Graphics);
         }
 
@@ -325,6 +329,24 @@ namespace LP_PopovD_App
 
         internal void PaintScene(Graphics graphics) => PaintScene(graphics, ClientRectangle);
 
+        internal void InvalidateCracks(Rectangle area)
+        {
+            if (screen == AppScreen.Schedule) scheduleBoard.Invalidate(area);
+            else Invalidate(area, invalidateChildren: false);
+        }
+
+        internal void PaintScheduleCracks(Graphics graphics)
+        {
+            if (screen == AppScreen.Schedule && !loading) backButton.PaintCrackedIce(graphics);
+        }
+
+        private void AmbientEffectsFrame(float seconds)
+        {
+            if (IsDisposed || Disposing || !shown || !Visible || WindowState == FormWindowState.Minimized || Busy) return;
+            if (screen == AppScreen.Schedule) { scheduleBoard.RefreshTime(); return; }
+            if (titleGlow != null) Invalidate(titleGlow.Bounds, invalidateChildren: false);
+        }
+
         internal void PaintScene(Graphics graphics, Rectangle sourceBounds, bool withoutSticks = false)
         {
             GraphicsState saved = graphics.Save();
@@ -350,6 +372,18 @@ namespace LP_PopovD_App
             if (screen is not (AppScreen.Menu or AppScreen.Schedule) && !withoutSticks &&
                 sourceBounds.IntersectsWith(StickFeedbackDrawing.PixelBounds(ClientSize)))
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
+            if (screen != AppScreen.Schedule)
+            {
+                bool menu = screen == AppScreen.Menu;
+                if (titleGlow == null || titleGlow.Size != ClientSize || titleGlowMenu != menu)
+                {
+                    titleGlow?.Dispose();
+                    titleGlow = new TitleGlowDrawing(ClientSize, menu);
+                    titleGlowMenu = menu;
+                }
+                if (sourceBounds.IntersectsWith(titleGlow.Bounds))
+                    titleGlow.Draw(graphics, FrostHoverAnimation.Seconds);
+            }
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
             {
                 RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
@@ -372,6 +406,9 @@ namespace LP_PopovD_App
 
         private void DisposeArtwork()
         {
+            FrostHoverAnimation.Frame -= AmbientEffectsFrame;
+            scheduleBoard.OverlayPaint -= PaintScheduleCracks;
+            titleGlow?.Dispose(); titleGlow = null;
             surfaces?.Dispose(); surfaces = null; sceneCache = null;
             transitionRenderer?.Dispose(); transitionRenderer = null;
             transitionFrom?.Dispose(); transitionTo?.Dispose(); transitionFrom = transitionTo = null;
@@ -430,6 +467,8 @@ namespace LP_PopovD_App
             submitButton.AccessibleName = submitButton.Text;
             submitButton.SetScale(scale);
             backButton.SetScale(scale);
+            backButton.Text = screen == AppScreen.Menu ? "КО ВХОДУ" : "НАЗАД";
+            backButton.AccessibleName = screen == AppScreen.Menu ? "Ко входу" : "Назад";
             submitButton.Bounds = ToPixels(registration ? JerseyDrawing.SubmitBounds : JerseyDrawing.LoginSubmitBounds);
             backButton.Bounds = screen == AppScreen.Schedule
                 ? new Rectangle(
@@ -437,7 +476,7 @@ namespace LP_PopovD_App
                     Math.Max(12, (int)(ClientSize.Height * .0578f)),
                     Math.Max(96, (int)(ClientSize.Width * .108f)),
                     Math.Max(36, (int)(ClientSize.Height * .0645f)))
-                : ToPixels(JerseyDrawing.BackBounds);
+                : ToPixels(screen == AppScreen.Menu ? RinkDrawing.MenuBackBounds : JerseyDrawing.BackBounds);
         }
 
         private void HideScreenControls()
@@ -655,6 +694,7 @@ namespace LP_PopovD_App
                 if (target == AppScreen.Schedule && screen != AppScreen.Schedule)
                 {
                     scheduleReturnScreen = screen;
+                    scheduleBoard.BookingEnabled = screen == AppScreen.Menu;
                     if (!string.IsNullOrWhiteSpace(authenticatedLogin)) scheduleBoard.SuggestedTenant = authenticatedLogin;
                 }
                 screen = target;

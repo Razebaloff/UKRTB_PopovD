@@ -119,7 +119,7 @@ namespace LP_PopovD_App
                             float d = RinkDrawing.ButtonDiameter;
                             RinkTypography.Draw(g, labels[i], new RectangleF(c.X - d / 2, c.Y - d / 2, d, d), RinkDrawing.Blue);
                         }
-                        JerseyDrawing.DrawCapsule(g, JerseyDrawing.BackBounds, "НАЗАД", false);
+                        JerseyDrawing.DrawCapsule(g, RinkDrawing.MenuBackBounds, "КО ВХОДУ", false);
                     }
                     break;
             }

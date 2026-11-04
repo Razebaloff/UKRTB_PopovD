@@ -4,6 +4,7 @@ namespace LP_PopovD_App
     {
         private Bitmap? crackTexture;
         private Size crackSize;
+        private float lastCrackAmount;
 
         internal void PaintCrackedIce(Graphics background)
         {
@@ -21,8 +22,17 @@ namespace LP_PopovD_App
         {
             // Трещины выходят за круглый Region кнопки, поэтому
             // перерисовываем только окружающее её кольцо на Form1.
-            if (Parent != null && Visible)
-                Parent.Invalidate(PuckCrackDrawing.Bounds(Bounds));
+            float amount = HoverCrackAmount;
+            if (Parent == null || !Visible || Math.Abs(amount - lastCrackAmount) < .0005f) return;
+            lastCrackAmount = amount;
+            using Region ring = new(PuckCrackDrawing.Bounds(Bounds));
+            if (Region != null)
+            {
+                using Region body = Region.Clone();
+                body.Translate(Left, Top);
+                ring.Exclude(body);
+            }
+            Parent.Invalidate(ring, invalidateChildren: false);
         }
 
         protected override void OnResize(EventArgs e)
