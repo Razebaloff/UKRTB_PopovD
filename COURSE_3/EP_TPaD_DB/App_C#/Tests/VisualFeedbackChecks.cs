@@ -74,7 +74,18 @@ internal static class VisualFeedbackChecks
                 finally { image.UnlockBits(data); }
             }
             byte[] first = Frame(0), later = Frame(3);
-            Check(!first.AsSpan().SequenceEqual(later), "Серо-белый блик движется по буквам заголовка.");
+            Check(!first.AsSpan().SequenceEqual(later), "Свечение плавно меняет общую яркость.");
+            int peakFirst = 0, peakLater = 0;
+            for (int i = 3; i < first.Length; i += 4)
+            {
+                peakFirst = Math.Max(peakFirst, first[i]);
+                peakLater = Math.Max(peakLater, later[i]);
+            }
+            bool uniform = peakFirst > 0 && peakLater > 0;
+            for (int i = 3; i < first.Length && uniform; i += 4)
+                uniform = Math.Abs(first[i] * peakLater - later[i] * peakFirst) <=
+                    2 * (peakFirst + peakLater);
+            Check(uniform, "Все участки ореола меняют яркость вместе, без движущегося светового пятна.");
             Check(ReferenceEquals(halo, glowType.GetField("halo", Hidden)!.GetValue(glow)),
                 "Ореол не создаётся повторно на каждом кадре.");
         }
