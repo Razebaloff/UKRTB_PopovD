@@ -81,6 +81,12 @@ internal static class VisualFeedbackChecks
                 peakFirst = Math.Max(peakFirst, first[i]);
                 peakLater = Math.Max(peakLater, later[i]);
             }
+            int visibleWhite = 0;
+            for (int i = 0; i < first.Length; i += 4)
+                if (first[i + 3] > 210 && first[i] >= 245 && first[i + 1] >= 245 && first[i + 2] >= 245)
+                    visibleWhite++;
+            Check(visibleWhite > 100, "Подсветка содержит заметную белую основу букв, а не только слабый внешний ореол.");
+            Check(Math.Abs(peakFirst - peakLater) >= 8, "Общая пульсация белого свечения видима.");
             bool uniform = peakFirst > 0 && peakLater > 0;
             for (int i = 3; i < first.Length && uniform; i += 4)
                 uniform = Math.Abs(first[i] * peakLater - later[i] * peakFirst) <=

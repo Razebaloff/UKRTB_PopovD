@@ -5,7 +5,8 @@ using System.Runtime.InteropServices;
 namespace LP_PopovD_App
 {
     // Геометрия букв и мягкий ореол строятся один раз на размер окна.
-    // В кадре едва заметно меняется только общая яркость всей надписи.
+    // Белая светящаяся основа букв и мягкий ореол кэшируются вместе.
+    // В кадре плавно меняется общая яркость без движения светового пятна.
     internal sealed class TitleGlowDrawing : IDisposable
     {
         private readonly GraphicsPath glyphs;
@@ -42,19 +43,29 @@ namespace LP_PopovD_App
             byte[] close = Blur(alpha, mask.Width, mask.Height, Math.Max(1, (int)MathF.Ceiling(1.5f * scale)));
             for (int i = 0; i < pixels.Length; i++)
             {
-                // Свет равномерно исходит от контуров букв: близкий мягкий
-                // ореол и слабое рассеяние вдали. Сама надпись сохраняет цвет.
-                int nearLight = close[i] * 3 / 4;
-                int farLight = diffuse[i] / 3;
+                // Яркое ближнее свечение и широкое рассеяние вокруг букв.
+                int nearLight = Math.Min(245, close[i] * 3 / 2);
+                int farLight = Math.Min(195, diffuse[i] * 2);
                 int a = (nearLight + farLight - nearLight * farLight / 255) * (255 - alpha[i]) / 255;
-                int grayWhite = a * 245 / 255;
-                pixels[i] = a << 24 | grayWhite << 16 | grayWhite << 8 | grayWhite;
+                pixels[i] = a << 24 | a << 16 | a << 8 | a;
             }
             halo = new Bitmap(mask.Width, mask.Height, PixelFormat.Format32bppPArgb);
             halo.SetResolution(96, 96);
             data = halo.LockBits(new Rectangle(Point.Empty, halo.Size), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
             try { for (int y = 0; y < halo.Height; y++) Marshal.Copy(pixels, y * halo.Width, IntPtr.Add(data.Scan0, y * data.Stride), halo.Width); }
             finally { halo.UnlockBits(data); }
+            using (Graphics light = Graphics.FromImage(halo))
+            {
+                light.TranslateTransform(-Bounds.X, -Bounds.Y);
+                light.SmoothingMode = SmoothingMode.AntiAlias;
+                light.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                // Тонкая холодная грань сохраняет читаемость на светлом льду.
+                using Pen edge = new(Color.FromArgb(190, 24, 51, 71), Math.Max(1.2f, 1.05f * scale))
+                    { LineJoin = LineJoin.Round };
+                light.DrawPath(edge, glyphs);
+                using SolidBrush white = new(Color.White);
+                light.FillPath(white, glyphs);
+            }
         }
 
         private static byte[] Blur(byte[] input, int width, int height, int radius)
@@ -95,7 +106,7 @@ namespace LP_PopovD_App
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 // Одна интенсивность для всего слоя. Положение и форма
                 // света неподвижны; нет бегущего блика или светового пятна.
-                float intensity = .86f + .025f * MathF.Sin(seconds * .6f);
+                float intensity = .92f + .08f * MathF.Sin(seconds * 1.25f);
                 using ImageAttributes opacity = new();
                 opacity.SetColorMatrix(new ColorMatrix { Matrix33 = intensity });
                 g.DrawImage(halo, Bounds, 0, 0, halo.Width, halo.Height, GraphicsUnit.Pixel, opacity);
