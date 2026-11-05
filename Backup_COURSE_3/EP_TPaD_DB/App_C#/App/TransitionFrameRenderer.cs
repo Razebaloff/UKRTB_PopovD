@@ -55,8 +55,7 @@ namespace LP_PopovD_App
             if (progress <= 0 || progress >= 1)
             {
                 Image image = progress <= 0 ? originalFrom : originalTo;
-                if (image.Size == displaySize) output.DrawImageUnscaled(image, 0, 0);
-                else output.DrawImage(image, destination, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
+                output.DrawImage(image, destination, 0, 0, image.Width, image.Height, GraphicsUnit.Pixel);
             }
             else if (revealOnly)
             {

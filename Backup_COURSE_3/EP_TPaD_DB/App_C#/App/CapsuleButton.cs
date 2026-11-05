@@ -10,15 +10,34 @@ namespace LP_PopovD_App
         private Font? labelFont;
         private float fontPixels;
         private readonly FrostHoverAnimation frost;
-        private Bitmap? frostTexture, iceTexture, captionLayer;
-        private Size frostTextureSize;
+        private readonly bool crackOnHover;
+        private Bitmap? crackLayer;
+        private Size crackSize;
+        private float lastCrackAmount;
+        internal float CrackAmount => crackOnHover ? frost.Amount : 0;
+
+        internal void PaintCrackedIce(Graphics background)
+        {
+            if (!crackOnHover || !Visible || CrackAmount < .003f ||
+                Width < 10 || Height < 10) return;
+            if (crackLayer == null || crackSize != ClientSize)
+            {
+                crackLayer?.Dispose();
+                crackSize = ClientSize;
+                crackLayer = CapsuleCrackDrawing.Create(ClientSize, 8171);
+            }
+            CapsuleCrackDrawing.Draw(background, crackLayer, Bounds, CrackAmount);
+        }
+        private FrostSpeck[]? frostSpecks;
+        private Bitmap? captionLayer;
         private (Size Size, string Text, int Foreground, bool Primary, float FontPixels) captionKey;
         [DefaultValue(false)]
         internal bool Primary { get; set; }
         protected override bool ShowFocusCues => false;
 
-        internal CapsuleButton()
+        internal CapsuleButton(bool crackOnHover = false)
         {
+            this.crackOnHover = crackOnHover;
             SetStyle(ControlStyles.UserPaint | ControlStyles.Opaque | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             FlatStyle = FlatStyle.Flat;
@@ -26,7 +45,18 @@ namespace LP_PopovD_App
             Cursor = Cursors.Hand;
             UseMnemonic = false;
             AccessibleRole = AccessibleRole.PushButton;
-            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost = new FrostHoverAnimation(() =>
+            {
+                if (IsDisposed || !IsHandleCreated || FindForm()?.WindowState == FormWindowState.Minimized) return;
+                Invalidate();
+                float amount = CrackAmount;
+                if (crackOnHover && Parent != null && Visible && Math.Abs(amount - lastCrackAmount) >= .0005f)
+                {
+                    lastCrackAmount = amount;
+                    if (Parent is Form1 form) form.InvalidateCracks(CapsuleCrackDrawing.Bounds(Bounds));
+                    else Parent.Invalidate(CapsuleCrackDrawing.Bounds(Bounds), invalidateChildren: false);
+                }
+            }, crackOnHover ? 900 : 285);
             frost.SetVisible(Visible);
         }
         internal void SetScale(float scale)
@@ -42,10 +72,19 @@ namespace LP_PopovD_App
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            frostTexture?.Dispose();
-            iceTexture?.Dispose();
-            frostTexture = iceTexture = null;
-            frostTextureSize = Size.Empty;
+            // Окно кнопки имеет ту же овальную форму, что и отрисовка.
+            // Углы не закрашивают фон расположенного под ней расписания.
+            if (Width > 2 && Height > 2)
+            {
+                using GraphicsPath shape = JerseyDrawing.Capsule(new RectangleF(0, 0, Width, Height));
+                Region? previous = Region;
+                Region = new Region(shape);
+                previous?.Dispose();
+            }
+            frostSpecks = null;
+            crackLayer?.Dispose();
+            crackLayer = null;
+            crackSize = Size.Empty;
             captionLayer?.Dispose();
             captionLayer = null;
         }
@@ -77,21 +116,15 @@ namespace LP_PopovD_App
             g.DrawPath(edge, shape);
             // Сначала нарастает иней по краям овальной тканевой вставки,
             // затем поверх него остаётся хорошо читаемая надпись.
-            float ambient = frost.Ambient * (1 - frost.Amount);
-            if (ambient > .002f || frost.Amount > .002f)
-            {
-                if (frostTexture == null || frostTextureSize != ClientSize)
-                {
-                    frostTexture?.Dispose();
-                    frostTextureSize = ClientSize;
-                    frostTexture = FrostDrawing.CreateTexture(ClientSize, false, 3751 + Text.Length * 109);
-                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, false);
-                }
-                if (ambient > .002f)
-                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
-                if (frost.Amount > .002f && iceTexture != null)
-                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
-            }
+            frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, false,
+                3751 + Text.Length * 109);
+            // На всех овальных кнопках — только тонкие морозные прожилки.
+            // Без квадратной вырезки: мягкое затухание узоров под надписью
+            // рассчитывается отдельно для каждой прожилки в FrostDrawing.
+            float ambient = frost.Ambient;
+            if (ambient > .015f)
+                FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
+                    FrostHoverAnimation.Seconds, ambient, false, protectCaption: Primary);
             var labelKey = (ClientSize, Text, ForeColor.ToArgb(), Primary, fontPixels);
             if (captionLayer == null || captionKey != labelKey)
             {
@@ -119,10 +152,27 @@ namespace LP_PopovD_App
                 else label.DrawString(Text, Font, ink, ClientRectangle, center);
                 captionKey = labelKey;
             }
-            g.DrawImageUnscaled(captionLayer, 0, 0);
+            // Размер надписи уже учитывает масштаб сцены: переносим
+            // пиксели без повторного пересчёта по DPI монитора.
+            g.DrawImage(captionLayer, ClientRectangle, 0, 0,
+                captionLayer.Width, captionLayer.Height, GraphicsUnit.Pixel);
+            // Фокус выделяется небольшим изменением цвета самой кнопки.
+            // Отдельная белая контурная линия не создаётся.
         }
-        protected override void OnMouseEnter(EventArgs e) { hovered = true; frost.SetTarget(true); Invalidate(); base.OnMouseEnter(e); }
-        protected override void OnMouseLeave(EventArgs e) { hovered = pressed = false; frost.SetTarget(false); Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            hovered = true;
+            if (crackOnHover) frost.SetTarget(true);
+            Invalidate();
+            base.OnMouseEnter(e);
+        }
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            hovered = pressed = false;
+            if (crackOnHover) frost.SetTarget(false);
+            Invalidate();
+            base.OnMouseLeave(e);
+        }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = e.Button == MouseButtons.Left; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -132,8 +182,7 @@ namespace LP_PopovD_App
             if (disposing)
             {
                 frost?.Dispose();
-                frostTexture?.Dispose();
-                iceTexture?.Dispose();
+                crackLayer?.Dispose();
                 captionLayer?.Dispose();
                 labelFont?.Dispose();
             }

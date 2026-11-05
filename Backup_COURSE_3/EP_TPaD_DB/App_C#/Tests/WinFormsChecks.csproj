@@ -9,6 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="WinFormsChecks.cs" />
+    <Compile Include="ButtonDpiChecks.cs" />
+    <Compile Include="VerificationRevealChecks.cs" />
+    <Compile Include="VisualFeedbackChecks.cs" />
     <ProjectReference Include="../App/LP_PopovD_App.csproj" />
   </ItemGroup>
 </Project>

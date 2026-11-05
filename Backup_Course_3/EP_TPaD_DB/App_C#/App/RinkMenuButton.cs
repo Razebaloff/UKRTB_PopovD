@@ -7,9 +7,15 @@ namespace LP_PopovD_App
     {
         private bool hovered;
         private bool pressed;
-        private Bitmap? buttonLayer, captionLayer, frostTexture, iceTexture;
+        private Bitmap? buttonLayer, captionLayer;
         private readonly FrostHoverAnimation frost;
-        private Size frostTextureSize;
+        private FrostSpeck[]? frostSpecks;
+        private FrostSpeck[]? hoverSpecks;
+        // При наведении на шайбу растут только трещины во льду ВОКРУГ,
+        // не появляется голубая прозрачная плёнка на самой шайбе.
+        protected virtual bool TracksHoverCracks => this is PuckButton;
+        protected float HoverCrackAmount => TracksHoverCracks ? frost.Amount : 0;
+        protected virtual void OnFrostFrame() { }
         private (Size Size, string Text, int Color, bool Hovered, bool Pressed, bool Focused) layerKey;
         private (Size Size, string Text, int Color, bool Pressed) captionKey;
         protected override bool ShowFocusCues => false;
@@ -26,17 +32,20 @@ namespace LP_PopovD_App
             UseVisualStyleBackColor = false;
             Cursor = Cursors.Hand;
             AccessibleRole = AccessibleRole.PushButton;
-            frost = new FrostHoverAnimation(() => { if (!IsDisposed && IsHandleCreated) Invalidate(); });
+            frost = new FrostHoverAnimation(() =>
+            {
+                if (IsDisposed || !IsHandleCreated || FindForm()?.WindowState == FormWindowState.Minimized) return;
+                Invalidate();
+                OnFrostFrame();
+            }, this is PuckButton ? 900 : 285);
             frost.SetVisible(Visible);
         }
 
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            frostTexture?.Dispose();
-            iceTexture?.Dispose();
-            frostTexture = iceTexture = null;
-            frostTextureSize = Size.Empty;
+            frostSpecks = null;
+            hoverSpecks = null;
             if (Width < 2 || Height < 2)
                 return;
             using GraphicsPath shape = new();
@@ -78,20 +87,21 @@ namespace LP_PopovD_App
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.None;
             g.DrawImage(buttonLayer, ClientRectangle, 0, 0, buttonLayer.Width, buttonLayer.Height, GraphicsUnit.Pixel);
-            float ambient = frost.Ambient * (1 - frost.Amount);
-            if (ambient > .002f || frost.Amount > .002f)
+            // Микрокристаллы оседают, растут и тают независимо. Каждый
+            // следующий цикл выбирает новые точки из детерминированного seed.
+            frostSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true,
+                8491 + Text.Length * 71);
+            float ambient = frost.Ambient;
+            if (ambient > .015f)
+                FrostDrawing.DrawSpecks(g, ClientRectangle, frostSpecks,
+                    FrostHoverAnimation.Seconds, ambient, true);
+            if (TracksHoverCracks && frost.Amount > .015f)
             {
-                if (frostTexture == null || frostTextureSize != ClientSize)
-                {
-                    frostTexture?.Dispose();
-                    frostTextureSize = ClientSize;
-                    frostTexture = FrostDrawing.CreateTexture(ClientSize, true, 8491 + Text.Length * 71);
-                    iceTexture = FrostDrawing.CreateIceLayer(frostTexture, true);
-                }
-                if (ambient > .002f)
-                    FrostDrawing.DrawLayer(g, frostTexture, ClientRectangle, SnowDrawing.Smooth(ambient));
-                if (frost.Amount > .002f && iceTexture != null)
-                    FrostDrawing.DrawLayer(g, iceTexture, ClientRectangle, frost.Amount);
+                // Только тонкие растущие ветви инея. Сплошной заливки,
+                // голубой плёнки и ледяной корки здесь нет.
+                hoverSpecks ??= FrostDrawing.CreateSpecks(ClientSize, true, 12731 + Text.Length * 93);
+                FrostDrawing.DrawSpecks(g, ClientRectangle, hoverSpecks,
+                    FrostHoverAnimation.Seconds * .72f + .81f, frost.Amount * 1.65f, true);
             }
             // Построение контура надписи — дорогая операция GDI+.
             // Выполняем её при изменении текста/размера/нажатия, а
@@ -109,7 +119,12 @@ namespace LP_PopovD_App
                 DrawCaptionOnTop(type, pressed);
                 captionKey = labelKey;
             }
-            g.DrawImageUnscaled(captionLayer, 0, 0);
+            // Слой уже рассчитан в пикселях ClientSize. DrawImageUnscaled
+            // повторно увеличивает bitmap 96 DPI на мониторах 120/144/192 DPI.
+            g.DrawImage(captionLayer, ClientRectangle, 0, 0,
+                captionLayer.Width, captionLayer.Height, GraphicsUnit.Pixel);
+            // Клавиатурный фокус обозначается подсветкой фактуры в
+            // DrawButton, без белого пунктирного кольца вокруг шайбы.
         }
 
         protected virtual void DrawButton(Graphics g, bool hovered, bool pressed, bool focused)
@@ -131,7 +146,7 @@ namespace LP_PopovD_App
         protected override void OnMouseEnter(EventArgs e)
         {
             hovered = true;
-            frost.SetTarget(true);
+            if (TracksHoverCracks) frost.SetTarget(true);
             Invalidate();
             base.OnMouseEnter(e);
         }
@@ -140,7 +155,7 @@ namespace LP_PopovD_App
         {
             hovered = false;
             pressed = false;
-            frost.SetTarget(false);
+            if (TracksHoverCracks) frost.SetTarget(false);
             Invalidate();
             base.OnMouseLeave(e);
         }
@@ -200,8 +215,6 @@ namespace LP_PopovD_App
             if (disposing)
             {
                 frost?.Dispose();
-                frostTexture?.Dispose();
-                iceTexture?.Dispose();
                 captionLayer?.Dispose();
                 buttonLayer?.Dispose();
             }

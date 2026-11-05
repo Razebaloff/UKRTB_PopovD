@@ -11,13 +11,17 @@ namespace LP_PopovD_App
         private static readonly Stopwatch sharedTime = Stopwatch.StartNew();
         private static readonly HashSet<FrostHoverAnimation> active = new();
         private static readonly System.Windows.Forms.Timer sharedTimer = CreateTimer();
+        internal static event Action<float>? Frame;
+        private static int lastEffectFrame = -1;
         private readonly Stopwatch transition = new();
         private readonly Action invalidate;
+        private readonly float transitionMilliseconds;
         private float from, target;
         private bool visible, disposed;
-        private float lastAmbient = -1;
+        private int lastAmbientFrame = -1;
 
         internal float Amount { get; private set; }
+        internal static float Seconds => (float)sharedTime.Elapsed.TotalSeconds;
 
         private static System.Windows.Forms.Timer CreateTimer()
         {
@@ -32,32 +36,34 @@ namespace LP_PopovD_App
             foreach (FrostHoverAnimation item in active)
             {
                 item.UpdateAmount();
-                // Не будим кнопку ради скрытого инея: при полном
-                // заледенении её фоновый слой не виден.
-                float ambient = item.Ambient * (1 - item.Amount);
+                // Отдельные микрокристаллы изменяются независимо.
+                // Ограничение фонового эффекта ~45 кадрами/с снижает
+                // стоимость перерисовок. Hover остаётся на 16 мс.
+                int frame = (int)(Seconds * 45);
                 bool hovering = item.transition.IsRunning;
-                if (hovering || MathF.Abs(item.lastAmbient - ambient) >= .003f)
+                if (hovering || item.lastAmbientFrame != frame)
                 {
-                    item.lastAmbient = ambient;
+                    item.lastAmbientFrame = frame;
                     item.invalidate();
                 }
             }
-        }
-
-        internal float Ambient
-        {
-            get
+            int effectFrame = (int)(Seconds * 30);
+            if (effectFrame != lastEffectFrame)
             {
-                if (!visible) return 0;
-                float t = (float)(sharedTime.Elapsed.TotalSeconds % 6.6) / 6.6f;
-                return t < .34f ? .80f * SnowDrawing.Smooth(t / .34f)
-                    : t < .48f ? .80f
-                    : t < .80f ? .80f * (1 - SnowDrawing.Smooth((t - .48f) / .32f))
-                    : 0f;
+                lastEffectFrame = effectFrame;
+                Frame?.Invoke(Seconds);
             }
         }
 
-        internal FrostHoverAnimation(Action invalidate) => this.invalidate = invalidate;
+        // Каждый очаг инея живёт самостоятельно, общий коэффициент больше
+        // не заставляет всю поверхность замерзать и таять одновременно.
+        internal float Ambient => visible ? 1f : 0f;
+
+        internal FrostHoverAnimation(Action invalidate, int hoverDurationMilliseconds = 285)
+        {
+            this.invalidate = invalidate;
+            transitionMilliseconds = Math.Max(180, hoverDurationMilliseconds);
+        }
 
         internal void SetVisible(bool value)
         {
@@ -67,7 +73,7 @@ namespace LP_PopovD_App
             {
                 active.Add(this);
                 if (!sharedTimer.Enabled) sharedTimer.Start();
-                lastAmbient = -1;
+                lastAmbientFrame = -1;
                 invalidate();
             }
             else
@@ -93,7 +99,8 @@ namespace LP_PopovD_App
         private void UpdateAmount()
         {
             if (!transition.IsRunning) return;
-            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds / 285f), 0, 1);
+            float p = Math.Clamp((float)(transition.Elapsed.TotalMilliseconds /
+                transitionMilliseconds), 0, 1);
             Amount = from + (target - from) * SnowDrawing.Smooth(p);
             if (p >= 1)
             {
@@ -106,7 +113,7 @@ namespace LP_PopovD_App
         {
             transition.Reset();
             Amount = from = target = 0;
-            lastAmbient = -1;
+            lastAmbientFrame = -1;
         }
 
         public void Dispose()
@@ -114,6 +121,27 @@ namespace LP_PopovD_App
             if (disposed) return;
             SetVisible(false);
             disposed = true;
+        }
+    }
+
+    // Независимые очаги; Seed меняет точку оседания после каждого цикла.
+    internal readonly struct FrostSpeck
+    {
+        internal readonly uint Seed;
+        internal readonly float Phase, Grow, Hold, Melt, Size, Opacity;
+        internal readonly int Variant;
+
+        internal FrostSpeck(uint seed, float phase, float grow, float hold,
+            float melt, float size, float opacity, int variant)
+        {
+            Seed = seed;
+            Phase = phase;
+            Grow = grow;
+            Hold = hold;
+            Melt = melt;
+            Size = size;
+            Opacity = opacity;
+            Variant = variant;
         }
     }
 
@@ -227,6 +255,278 @@ namespace LP_PopovD_App
             return bitmap;
         }
 
+        // Вместо похожих на снежинки звёздочек — ветвящиеся ледяные
+        // прожилки, как при образовании морозного узора на стекле.
+        // Фаза, длина, положение и время таяния каждой прожилки независимы.
+        private const float SpeckCycle = 3.65f;
+        private const int GrowthStages = 9;
+        private const int OpacityStages = 7;
+        private const int SpriteSize = 80;
+        private const int FilamentVariants = 5;
+        private static readonly Bitmap?[,,] filamentSprites =
+            new Bitmap[FilamentVariants, GrowthStages, OpacityStages];
+
+        private static uint Mix(uint seed)
+        {
+            seed ^= seed >> 16;
+            seed = unchecked(seed * 0x7feb352du);
+            seed ^= seed >> 15;
+            seed = unchecked(seed * 0x846ca68bu);
+            return seed ^ (seed >> 16);
+        }
+
+        private static float Unit(uint hash) => (hash & 0x00ffffffu) / 16777215f;
+
+        internal static FrostSpeck[] CreateSpecks(Size size, bool round, int seed)
+        {
+            int area = Math.Max(1, size.Width) * Math.Max(1, size.Height);
+            int count = round ? Math.Clamp(area / 1200, 42, 108)
+                : Math.Clamp(area / 330, 48, 124);
+            Random random = new(seed);
+            FrostSpeck[] result = new FrostSpeck[count];
+            for (int i = 0; i < count; i++)
+                result[i] = new FrostSpeck(
+                    unchecked((uint)random.NextInt64()),
+                    random.NextSingle() * SpeckCycle,
+                    .43f + random.NextSingle() * .47f,
+                    .16f + random.NextSingle() * .35f,
+                    .58f + random.NextSingle() * .53f,
+                    round ? .18f + random.NextSingle() * .16f
+                        : 1.20f + random.NextSingle() * .78f,
+                    .65f + random.NextSingle() * .35f,
+                    random.Next(FilamentVariants));
+            return result;
+        }
+
+        private static Bitmap GetFilamentSprite(int variant, int growth, int opacity)
+        {
+            Bitmap? cached = filamentSprites[variant, growth, opacity];
+            if (cached != null) return cached;
+            Bitmap result = new(SpriteSize, SpriteSize, PixelFormat.Format32bppPArgb);
+            result.SetResolution(96, 96);
+            using Graphics g = Graphics.FromImage(result);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            float alpha = (opacity + 1f) / OpacityStages;
+            float extension = (growth + 1f) / GrowthStages;
+            float angle = variant * MathF.Tau / FilamentVariants + .21f;
+            float ux = MathF.Cos(angle), uy = MathF.Sin(angle);
+            float nx = -uy, ny = ux;
+            Random random = new(4761 + variant * 3109);
+            PointF[] spine = new PointF[8];
+            for (int k = 0; k < spine.Length; k++)
+            {
+                float along = -28 + k * 8.1f;
+                float bend = (random.NextSingle() - .5f) * (k == 0 ? 0 : 11);
+                spine[k] = new PointF(40 + ux * along + nx * bend,
+                    40 + uy * along + ny * bend);
+            }
+
+            using Pen shadow = new(Color.FromArgb((int)(75 * alpha), 63, 136, 176), 3.1f)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using Pen gleam = new(Color.FromArgb((int)(218 * alpha), 240, 252, 255), 1.25f)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using Pen fine = new(Color.FromArgb((int)(182 * alpha), 213, 242, 255), .82f)
+                { StartCap = LineCap.Round, EndCap = LineCap.Round };
+
+            // Основная ломаная нарастает последовательно вдоль прожилки.
+            for (int k = 0; k < spine.Length - 1; k++)
+            {
+                float from = k / (float)(spine.Length - 1);
+                float to = (k + 1f) / (spine.Length - 1);
+                float p = Math.Clamp((extension - from) / (to - from), 0, 1);
+                if (p <= 0) break;
+                PointF first = spine[k], second = spine[k + 1];
+                float ex = first.X + (second.X - first.X) * p;
+                float ey = first.Y + (second.Y - first.Y) * p;
+                g.DrawLine(shadow, first.X, first.Y, ex, ey);
+                g.DrawLine(gleam, first.X + .7f, first.Y - .6f, ex + .7f, ey - .6f);
+
+                if (k == 0 || k == spine.Length - 2) continue;
+                // Отдельные ответвления возникают только когда ледяной
+                // фронт достигает соответствующей точки.
+                float branchProgress = Math.Clamp((extension - from) * 4.7f, 0, 1);
+                if (branchProgress <= 0) continue;
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    float deviation = side * (.53f + random.NextSingle() * .45f);
+                    float direction = angle + deviation;
+                    float dist = (8 + random.NextSingle() * 10) * branchProgress;
+                    float dx = MathF.Cos(direction), dy = MathF.Sin(direction);
+                    PointF tip = new(first.X + dx * dist, first.Y + dy * dist);
+                    g.DrawLine(fine, first, tip);
+                    if (branchProgress > .52f)
+                    {
+                        float limb = (branchProgress - .52f) * 12f;
+                        float wing = direction + side * .65f;
+                        g.DrawLine(fine, tip.X - dx * 3, tip.Y - dy * 3,
+                            tip.X - dx * 3 + MathF.Cos(wing) * limb,
+                            tip.Y - dy * 3 + MathF.Sin(wing) * limb);
+                    }
+                }
+            }
+
+            filamentSprites[variant, growth, opacity] = result;
+            return result;
+        }
+
+        internal static void DrawSpecks(Graphics g, Rectangle bounds,
+            FrostSpeck[] specks, float seconds, float intensity, bool round,
+            bool protectCaption = false)
+        {
+            if (bounds.Width < 5 || bounds.Height < 5 || intensity < .015f) return;
+            GraphicsState state = g.Save();
+            using GraphicsPath clip = Shape(new RectangleF(bounds.X + 1, bounds.Y + 1,
+                bounds.Width - 2, bounds.Height - 2), round);
+            g.SetClip(clip, CombineMode.Intersect);
+            g.InterpolationMode = InterpolationMode.Bilinear;
+            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            float diameter = Math.Min(bounds.Width, bounds.Height);
+            for (int i = 0; i < specks.Length; i++)
+            {
+                FrostSpeck speck = specks[i];
+                // На шайбах морозные прожилки растут и тают медленнее,
+                // чем на небольших овальных кнопках входа.
+                float speedFactor = round ? 1.65f : 1f;
+                float period = SpeckCycle * speedFactor;
+                float cycles = (seconds - speck.Phase * speedFactor) / period;
+                int generation = (int)MathF.Floor(cycles);
+                float age = (cycles - generation) * period;
+                float growTime = speck.Grow * speedFactor;
+                float holdTime = speck.Hold * speedFactor;
+                float meltTime = speck.Melt * speedFactor;
+                float total = growTime + holdTime + meltTime;
+                if (age > total) continue;
+
+                float growth = SnowDrawing.Smooth(Math.Clamp(age / growTime, 0, 1));
+                float fade = age < growTime + holdTime ? 1 :
+                    1 - SnowDrawing.Smooth((age - growTime - holdTime) / meltTime);
+                float strength = fade * speck.Opacity * intensity;
+                if (strength < .07f) continue;
+                int growthStep = Math.Clamp((int)(growth * GrowthStages), 0, GrowthStages - 1);
+                int opacityStep = Math.Clamp((int)(strength * OpacityStages), 0, OpacityStages - 1);
+
+                uint key = Mix(speck.Seed ^ unchecked((uint)generation * 0x9e3779b9u));
+                float u = Unit(Mix(key ^ 0xa24baed4u));
+                float v = Unit(Mix(key ^ 0x48a38b1fu));
+                float x, y;
+                if (round)
+                {
+                    float radius = MathF.Sqrt(u) * .91f;
+                    float polar = v * MathF.Tau;
+                    x = .5f + MathF.Cos(polar) * radius * .46f;
+                    y = .5f + MathF.Sin(polar) * radius * .46f;
+                }
+                else
+                {
+                    x = .06f + u * .88f;
+                    y = .15f + v * .70f;
+                }
+
+                // Овальные кнопки намного ниже шайб: масштабируем
+                // прожилки по высоте капсулы, а не по её площади.
+                if (protectCaption)
+                {
+                    // Не вырезаем прямоугольник. На первичной кнопке
+                    // прожилки плавно теряют яркость по мере приближения
+                    // к центральной надписи — без видимой границы маски.
+                    float dx = MathF.Abs(x - .5f);
+                    float dy = MathF.Abs(y - .5f);
+                    float horizontal = SnowDrawing.Smooth(Math.Clamp((dx - .28f) / .15f, 0, 1));
+                    float vertical = SnowDrawing.Smooth(Math.Clamp((dy - .12f) / .24f, 0, 1));
+                    float visibility = 1 - (1 - horizontal) * (1 - vertical);
+                    int adjusted = (int)(strength * visibility * OpacityStages);
+                    if (adjusted <= 0) continue;
+                    opacityStep = Math.Clamp(adjusted, 0, OpacityStages - 1);
+                }
+
+                float span = diameter * speck.Size;
+                float cx = bounds.Left + x * bounds.Width;
+                float cy = bounds.Top + y * bounds.Height;
+                Bitmap filament = GetFilamentSprite(speck.Variant, growthStep, opacityStep);
+                g.DrawImage(filament, new RectangleF(cx - span / 2,
+                    cy - span / 2, span, span));
+            }
+            g.Restore(state);
+        }
+
+        // Ледяная корка растёт отдельными асимметричными участками,
+        // пока не соединится в цельную поверхность. В кадре создаются
+        // только альфа-композиции готовых слоёв.
+        internal static Bitmap[] CreateIceGrowthFrames(Bitmap fullIce, bool round)
+        {
+            const int framesCount = 16;
+            Bitmap[] frames = new Bitmap[framesCount];
+            Size size = fullIce.Size;
+            for (int frame = 0; frame < frames.Length; frame++)
+            {
+                Bitmap layer = new(size.Width, size.Height, PixelFormat.Format32bppPArgb);
+                layer.SetResolution(96, 96);
+                frames[frame] = layer;
+                if (frame == 0 || size.Width < 5 || size.Height < 5) continue;
+                using Graphics g = Graphics.FromImage(layer);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                // Каждый промежуточный кадр обязан сохранять альфа-маску
+                // круглой/овальной кнопки. Это исключает прямоугольные
+                // углы, заметные при анимации по бокам.
+                using GraphicsPath silhouette = Shape(new RectangleF(1, 1,
+                    size.Width - 2, size.Height - 2), round);
+                g.SetClip(silhouette, CombineMode.Intersect);
+                if (frame == framesCount - 1)
+                {
+                    g.DrawImageUnscaled(fullIce, 0, 0);
+                    continue;
+                }
+                float progress = frame / (float)(framesCount - 1);
+                Random random = new(unchecked(size.Width * 1439 +
+                    size.Height * 751 + (round ? 1171 : 257)));
+                using GraphicsPath islands = new(FillMode.Winding);
+                int nuclei = round ? 30 : Math.Clamp(size.Width / 14, 20, 54);
+                for (int i = 0; i < nuclei; i++)
+                {
+                    float x = size.Width * (.08f + random.NextSingle() * .84f);
+                    float y = size.Height * (.08f + random.NextSingle() * .84f);
+                    float delay = random.NextSingle() * .41f;
+                    float grown = SnowDrawing.Smooth((progress - delay) / (1 - delay));
+                    float radius = (round ? Math.Min(size.Width, size.Height) * .48f
+                        : size.Height * 1.5f) * grown;
+                    if (radius < .2f) continue;
+                    float taper = .70f + random.NextSingle() * .62f;
+                    islands.AddEllipse(x - radius, y - radius * taper,
+                        radius * 2, radius * taper * 2);
+                }
+                if (islands.PointCount == 0) continue;
+                g.SetClip(islands, CombineMode.Intersect);
+                g.DrawImageUnscaled(fullIce, 0, 0);
+            }
+            return frames;
+        }
+
+        internal static void DrawIceGrowth(Graphics g, Bitmap[] stages, Rectangle bounds,
+            float amount, bool round)
+        {
+            if (amount <= .001f || stages.Length < 2 ||
+                bounds.Width < 5 || bounds.Height < 5) return;
+            GraphicsState original = g.Save();
+            // Гарантия, что ни один растровый кадр не закрашивает углы
+            // ограничивающего прямоугольника кнопки.
+            using GraphicsPath silhouette = Shape(new RectangleF(bounds.X + 1,
+                bounds.Y + 1, bounds.Width - 2, bounds.Height - 2), round);
+            g.SetClip(silhouette, CombineMode.Intersect);
+            float p = SnowDrawing.Smooth(Math.Clamp(amount, 0, 1));
+            float frame = p * (stages.Length - 1);
+            int index = Math.Clamp((int)frame, 0, stages.Length - 1);
+            if (index > 0)
+                g.DrawImageUnscaled(stages[index], bounds.Location);
+            if (index < stages.Length - 1)
+            {
+                float blend = frame - index;
+                if (blend > .002f)
+                    DrawLayer(g, stages[index + 1], bounds, blend);
+            }
+            g.Restore(original);
+        }
+
         // На каждом кадре выполняется только одна альфа-композиция
         // заранее подготовленной кристаллической текстуры: без сотен
         // случайных фигур, сложных масок и повторного рендеринга фактуры.
@@ -280,9 +580,6 @@ namespace LP_PopovD_App
             alpha.SetColorMatrix(new ColorMatrix { Matrix33 = Math.Clamp(.88f * p, 0, 1) });
             g.InterpolationMode = InterpolationMode.Bilinear;
             g.DrawImage(texture, bounds, 0, 0, texture.Width, texture.Height, GraphicsUnit.Pixel, alpha);
-            using Pen edge = new(Color.FromArgb((int)(200 * p), 245, 252, 255),
-                Math.Max(1f, bounds.Height * .018f)) { LineJoin = LineJoin.Round };
-            g.DrawPath(edge, shape);
             Random random = new(unchecked(bounds.Width * 1567 + bounds.Height * 1163 + (round ? 7291 : 113)));
             using Pen fracture = new(Color.White, .8f);
             int count = round ? 19 : 12;

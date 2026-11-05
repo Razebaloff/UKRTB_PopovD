@@ -8,6 +8,7 @@ namespace LP_PopovD_App
         internal const float Height = 800;
         internal const float FaceoffRadius = 120;
         internal const float ButtonDiameter = 232;
+        internal static readonly RectangleF MenuBackBounds = new(690, 702, 220, 52);
         internal static readonly Color Blue = Color.FromArgb(19, 65, 118);
         private static readonly Color Red = Color.FromArgb(220, 185, 37, 54);
 

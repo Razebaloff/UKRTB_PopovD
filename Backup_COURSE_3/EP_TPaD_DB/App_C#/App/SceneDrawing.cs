@@ -39,8 +39,18 @@ namespace LP_PopovD_App
             g.PixelOffsetMode = PixelOffsetMode.HighQuality;
             g.CompositingQuality = CompositingQuality.HighQuality;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            NativeIceDrawing.Draw(g, size);
-            DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks, codeRequested: codeRequested, authPanels: authPanels);
+            if (screen == AppScreen.Schedule)
+            {
+                // Расписание занимает всю поверхность окна. Фоновая
+                // сцена не содержит ни бортов, ни линий хоккейной арены.
+                ScheduleBoard.DrawBackdrop(g, size);
+            }
+            else
+            {
+                NativeIceDrawing.Draw(g, size);
+                DrawContents(g, size, screen, includeControls, status, includeSticks: includeSticks,
+                    codeRequested: codeRequested, authPanels: authPanels);
+            }
             g.Restore(saved);
         }
 
@@ -94,6 +104,10 @@ namespace LP_PopovD_App
                 case AppScreen.Registration:
                     JerseyDrawing.Draw(g, screen == AppScreen.Registration, includeControls, status, viewport, includeSticks, codeRequested, authPanels);
                     break;
+                case AppScreen.Schedule:
+                    // Реальная сетка и кнопка «НАЗАД» — дочерние контролы
+                    // Form1, не встроенный рисунок хоккейного поля.
+                    break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);
                     if (includeControls)
@@ -105,7 +119,7 @@ namespace LP_PopovD_App
                             float d = RinkDrawing.ButtonDiameter;
                             RinkTypography.Draw(g, labels[i], new RectangleF(c.X - d / 2, c.Y - d / 2, d, d), RinkDrawing.Blue);
                         }
-                        JerseyDrawing.DrawCapsule(g, JerseyDrawing.BackBounds, "НАЗАД", false);
+                        JerseyDrawing.DrawCapsule(g, RinkDrawing.MenuBackBounds, "КО ВХОДУ", false);
                     }
                     break;
             }

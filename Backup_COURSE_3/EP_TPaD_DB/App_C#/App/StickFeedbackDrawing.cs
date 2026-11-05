@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace LP_PopovD_App
 {
@@ -9,6 +10,7 @@ namespace LP_PopovD_App
         internal static readonly RectangleF AnimationBounds = new(741, -16, 118, 148);
         private static readonly SnowSeed[] snow = SnowDrawing.Seeds(224, 72419);
         private static Bitmap? left, right;
+        private static Bitmap? scheduleLeft, scheduleRight, leftHalo, rightHalo;
         private static int spriteSide;
 
         internal static void Prepare(Size size)
@@ -18,7 +20,50 @@ namespace LP_PopovD_App
             Dispose();
             left = Sprite(side, false);
             right = Sprite(side, true);
+            scheduleLeft = ForDarkBackground(left);
+            scheduleRight = ForDarkBackground(right);
+            leftHalo = Halo(left);
+            rightHalo = Halo(right);
             spriteSide = side;
+        }
+
+        private static Bitmap ForDarkBackground(Bitmap source)
+        {
+            Bitmap image = new(source.Width, source.Height, PixelFormat.Format32bppPArgb);
+            image.SetResolution(96, 96);
+            using Graphics g = Graphics.FromImage(image);
+            using ImageAttributes tint = new();
+            tint.SetColorMatrix(new ColorMatrix { Matrix00 = 1.15f, Matrix11 = 1.15f, Matrix22 = 1.15f,
+                Matrix40 = .17f, Matrix41 = .23f, Matrix42 = .29f });
+            g.DrawImage(source, new Rectangle(Point.Empty, image.Size), 0, 0, source.Width, source.Height, GraphicsUnit.Pixel, tint);
+            return image;
+        }
+
+        private static Bitmap Halo(Bitmap source)
+        {
+            int width = source.Width, height = source.Height;
+            int[] original = new int[width * height], result = new int[original.Length];
+            BitmapData data = source.LockBits(new Rectangle(Point.Empty, source.Size), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+            try { for (int y = 0; y < height; y++) Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), original, y * width, width); }
+            finally { source.UnlockBits(data); }
+            int radius = Math.Max(1, width / 60);
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    int alpha = 0;
+                    for (int dy = -radius; dy <= radius; dy++)
+                        for (int dx = -radius; dx <= radius; dx++)
+                            if (x + dx >= 0 && x + dx < width && y + dy >= 0 && y + dy < height)
+                                alpha = Math.Max(alpha, (int)((uint)original[(y + dy) * width + x + dx] >> 24));
+                    alpha = alpha * 130 / 255;
+                    result[y * width + x] = alpha << 24 | alpha * 145 / 255 << 16 | alpha * 220 / 255 << 8 | alpha;
+                }
+            Bitmap image = new(width, height, PixelFormat.Format32bppPArgb);
+            image.SetResolution(96, 96);
+            data = image.LockBits(new Rectangle(Point.Empty, image.Size), ImageLockMode.WriteOnly, PixelFormat.Format32bppPArgb);
+            try { for (int y = 0; y < height; y++) Marshal.Copy(result, y * width, IntPtr.Add(data.Scan0, y * data.Stride), width); }
+            finally { image.UnlockBits(data); }
+            return image;
         }
 
         private static Bitmap Sprite(int side, bool mirrored)
@@ -33,8 +78,14 @@ namespace LP_PopovD_App
             return image;
         }
 
-        internal static Rectangle PixelBounds(Size size)
+        internal static Rectangle PixelBounds(Size size, bool schedule = false)
         {
+            if (schedule)
+                return Rectangle.Intersect(new Rectangle(Point.Empty, size), Rectangle.Ceiling(new RectangleF(
+                    (1448 + AnimationBounds.X - Center.X) * size.Width / 1600f - 3,
+                    (73 + AnimationBounds.Y - Center.Y) * size.Height / 900f - 3,
+                    AnimationBounds.Width * size.Width / 1600f + 6,
+                    AnimationBounds.Height * size.Height / 900f + 6)));
             RectangleF c = RinkDrawing.GetCanvasBounds(size);
             float s = c.Width / RinkDrawing.Width;
             return Rectangle.Intersect(new Rectangle(Point.Empty, size), Rectangle.Ceiling(new RectangleF(
@@ -42,7 +93,7 @@ namespace LP_PopovD_App
                 AnimationBounds.Width * s + 4, AnimationBounds.Height * s + 4)));
         }
 
-        internal static void Draw(Graphics g, Size size, float? progress = null, bool fadeAtEnd = false)
+        internal static void Draw(Graphics g, Size size, float? progress = null, bool fadeAtEnd = false, bool schedule = false)
         {
             if (size.Width < 1 || size.Height < 1) return;
             Prepare(size);
@@ -52,8 +103,19 @@ namespace LP_PopovD_App
             g.CompositingMode = CompositingMode.SourceOver;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-            g.TranslateTransform(canvas.X, canvas.Y);
-            g.ScaleTransform(canvas.Width / RinkDrawing.Width, canvas.Height / RinkDrawing.Height);
+            if (schedule)
+            {
+                // В расписании шапка имеет собственную разметку 1600×900.
+                // Клюшки стоят справа от заголовка и не теряются в буквах.
+                g.TranslateTransform(size.Width * 1448 / 1600f, size.Height * 73 / 900f);
+                g.ScaleTransform(size.Width / 1600f, size.Height / 900f);
+                g.TranslateTransform(-Center.X, -Center.Y);
+            }
+            else
+            {
+                g.TranslateTransform(canvas.X, canvas.Y);
+                g.ScaleTransform(canvas.Width / RinkDrawing.Width, canvas.Height / RinkDrawing.Height);
+            }
             g.SetClip(AnimationBounds, CombineMode.Intersect);
             float p = Math.Clamp(progress ?? 0, 0, 1);
             float turn = p >= 1 ? 0 : 360 * SnowDrawing.Smooth(p);
@@ -62,15 +124,21 @@ namespace LP_PopovD_App
                 ? SnowDrawing.Smooth(p / .10f) * (1 - SnowDrawing.Smooth((p - .84f) / .16f)) : 1;
             float scale = 1 - .23f * SnowDrawing.Smooth(p / .18f) * SnowDrawing.Smooth((1 - p) / .18f);
             using ImageAttributes alpha = new();
-            if (p > 0 && p < 1) DrawBlizzard(g, p, envelope * opacity, foreground: false);
+            float snowStrength = envelope * opacity * (schedule ? .52f : 1);
+            if (p > 0 && p < 1) DrawBlizzard(g, p, snowStrength, foreground: false);
+            if (schedule)
+            {
+                DrawTurned(g, leftHalo!, turn, scale, opacity, alpha);
+                DrawTurned(g, rightHalo!, -turn, scale, opacity, alpha);
+            }
             if (envelope > .01f)
             {
                 DrawTurned(g, left!, turn - 10 * envelope, scale, envelope * .10f * opacity, alpha);
                 DrawTurned(g, right!, -turn + 10 * envelope, scale, envelope * .10f * opacity, alpha);
             }
-            DrawTurned(g, left!, turn, scale, opacity, alpha);
-            DrawTurned(g, right!, -turn, scale, opacity, alpha);
-            if (p > 0 && p < 1) DrawBlizzard(g, p, envelope * opacity, foreground: true);
+            DrawTurned(g, schedule ? scheduleLeft! : left!, turn, scale, opacity, alpha);
+            DrawTurned(g, schedule ? scheduleRight! : right!, -turn, scale, opacity, alpha);
+            if (p > 0 && p < 1) DrawBlizzard(g, p, snowStrength * (schedule ? .55f : 1), foreground: true);
             g.Restore(saved);
             g.CompositingMode = mode;
         }
@@ -198,6 +266,8 @@ namespace LP_PopovD_App
         internal static void Dispose()
         {
             left?.Dispose(); right?.Dispose(); left = right = null; spriteSide = 0;
+            scheduleLeft?.Dispose(); scheduleRight?.Dispose(); leftHalo?.Dispose(); rightHalo?.Dispose();
+            scheduleLeft = scheduleRight = leftHalo = rightHalo = null;
         }
     }
 }

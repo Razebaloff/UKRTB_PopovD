@@ -70,6 +70,17 @@ namespace LP_PopovD_App
             g.FillPath(ink, path);
         }
 
+        internal static GraphicsPath CreateMenuTitlePath()
+        {
+            GraphicsPath path = PuckCaption("ТЕРРИТОРИЯ\nХОККЕЯ");
+            RectangleF bounds = path.GetBounds();
+            float distance = MathF.Sqrt(bounds.Width * bounds.Width / 4 + bounds.Height * bounds.Height / 4);
+            float scale = 232 * .465f / Math.Max(1, distance);
+            using Matrix transform = new(scale, 0, 0, scale, 800, 400);
+            path.Transform(transform);
+            return path;
+        }
+
         // Размер рассчитывается по реальным контурам букв, а не по фиксированному шрифту.
         internal static void Draw(Graphics g, string text, RectangleF circle, Color color, bool outline = true)
         {

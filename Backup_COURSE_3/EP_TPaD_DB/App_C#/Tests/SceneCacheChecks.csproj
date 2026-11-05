@@ -14,6 +14,10 @@
     <Compile Include="../App/ArtworkResources.cs" />
     <Compile Include="../App/RinkTypography.cs" />
     <Compile Include="../App/SceneSurfaceCache.cs" />
+    <Compile Include="../App/ScheduleBoard.cs" />
+    <Compile Include="../App/TrainingSchedule.cs" />
+    <Compile Include="../App/TrainingBookingStore.cs" />
+    <Compile Include="../App/TrainingBookingDialog.cs" />
     <EmbeddedResource Include="../App/Assets/*.png" Exclude="../App/Assets/IceFrame.png">
       <LogicalName>LP_PopovD_App.Assets.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
