@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 namespace LP_PopovD_App
 {
     // Геометрия букв и мягкий ореол строятся один раз на размер окна.
-    // В кадре меняются лишь прозрачность ореола и положение белого блика.
+    // В кадре едва заметно меняется только общая яркость всей надписи.
     internal sealed class TitleGlowDrawing : IDisposable
     {
         private readonly GraphicsPath glyphs;
@@ -38,11 +38,17 @@ namespace LP_PopovD_App
             try { for (int y = 0; y < mask.Height; y++) Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), pixels, y * mask.Width, mask.Width); }
             finally { mask.UnlockBits(data); }
             byte[] alpha = pixels.Select(color => (byte)((uint)color >> 24)).ToArray();
-            alpha = Blur(Blur(alpha, mask.Width, mask.Height, radius), mask.Width, mask.Height, radius);
+            byte[] diffuse = Blur(Blur(alpha, mask.Width, mask.Height, radius), mask.Width, mask.Height, radius);
+            byte[] close = Blur(alpha, mask.Width, mask.Height, Math.Max(1, (int)MathF.Ceiling(1.5f * scale)));
             for (int i = 0; i < pixels.Length; i++)
             {
-                int a = Math.Min(220, alpha[i] * 2);
-                pixels[i] = a << 24 | a << 16 | a << 8 | a;
+                // Свет равномерно исходит от контуров букв: близкий мягкий
+                // ореол и слабое рассеяние вдали. Сама надпись сохраняет цвет.
+                int nearLight = close[i] * 3 / 4;
+                int farLight = diffuse[i] / 3;
+                int a = (nearLight + farLight - nearLight * farLight / 255) * (255 - alpha[i]) / 255;
+                int grayWhite = a * 245 / 255;
+                pixels[i] = a << 24 | grayWhite << 16 | grayWhite << 8 | grayWhite;
             }
             halo = new Bitmap(mask.Width, mask.Height, PixelFormat.Format32bppPArgb);
             halo.SetResolution(96, 96);
@@ -83,25 +89,18 @@ namespace LP_PopovD_App
         internal void Draw(Graphics g, float seconds)
         {
             GraphicsState state = g.Save();
-            g.CompositingMode = CompositingMode.SourceOver;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            float pulse = .62f + .18f * MathF.Sin(seconds * .93f);
-            using ImageAttributes opacity = new();
-            opacity.SetColorMatrix(new ColorMatrix { Matrix33 = pulse });
-            g.DrawImage(halo, Bounds, 0, 0, halo.Width, halo.Height, GraphicsUnit.Pixel, opacity);
-            RectangleF inkBounds = glyphs.GetBounds();
-            float center = .5f + .29f * MathF.Sin(seconds * .65f);
-            using LinearGradientBrush sheen = new(inkBounds, Color.Gray, Color.White, 0f);
-            sheen.InterpolationColors = new ColorBlend
+            try
             {
-                Positions = new[] { 0f, center - .18f, center, center + .18f, 1f },
-                Colors = new[] { Color.FromArgb(28, 178, 178, 178), Color.FromArgb(48, 210, 210, 210),
-                    Color.FromArgb((int)(150 + 36 * pulse), 255, 255, 255),
-                    Color.FromArgb(48, 210, 210, 210), Color.FromArgb(28, 178, 178, 178) }
-            };
-            g.FillPath(sheen, glyphs);
-            g.Restore(state);
+                g.CompositingMode = CompositingMode.SourceOver;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                // Одна интенсивность для всего слоя. Положение и форма
+                // света неподвижны; нет бегущего блика или светового пятна.
+                float intensity = .86f + .025f * MathF.Sin(seconds * .6f);
+                using ImageAttributes opacity = new();
+                opacity.SetColorMatrix(new ColorMatrix { Matrix33 = intensity });
+                g.DrawImage(halo, Bounds, 0, 0, halo.Width, halo.Height, GraphicsUnit.Pixel, opacity);
+            }
+            finally { g.Restore(state); }
         }
 
         public void Dispose() { glyphs.Dispose(); halo.Dispose(); }
