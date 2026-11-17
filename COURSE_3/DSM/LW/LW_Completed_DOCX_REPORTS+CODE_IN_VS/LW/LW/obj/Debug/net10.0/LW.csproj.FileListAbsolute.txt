@@ -1,0 +1,16 @@
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\bin\Debug\net10.0\LW.exe
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\bin\Debug\net10.0\LW.deps.json
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\bin\Debug\net10.0\LW.runtimeconfig.json
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\bin\Debug\net10.0\LW.dll
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\bin\Debug\net10.0\LW.pdb
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.AssemblyInfoInputs.cache
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.AssemblyInfo.cs
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.csproj.CoreCompileInputs.cache
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.sourcelink.json
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.dll
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\refint\LW.dll
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.pdb
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.genruntimeconfig.cache
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\ref\LW.dll
+C:\Users\Danik\OneDrive\Документы\GitHub\UKRTB_PopovD\COURSE_3\DSM\LW\LW_Completed_DOCX_REPORTS+CODE_IN_VS\LW\LW\obj\Debug\net10.0\LW.csproj.Up2Date
