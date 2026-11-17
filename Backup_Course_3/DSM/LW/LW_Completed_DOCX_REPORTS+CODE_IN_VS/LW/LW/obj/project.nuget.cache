@@ -1,8 +1,18 @@
 {
   "version": 2,
-  "dgSpecHash": "lWyMhwmLEP4=",
+  "dgSpecHash": "XDNDf6UPLew=",
   "success": true,
   "projectFilePath": "C:\\Users\\Danik\\OneDrive\\Документы\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS+CODE_IN_VS\\LW\\LW\\LW.csproj",
   "expectedPackageFiles": [],
-  "logs": []
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "message": "Ошибка чтения файла кэша C:\\Users\\Danik\\OneDrive\\Документы\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS+CODE_IN_VS\\LW\\LW\\obj\\project.nuget.cache: '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0.",
+      "projectPath": "C:\\Users\\Danik\\OneDrive\\Документы\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS+CODE_IN_VS\\LW\\LW\\LW.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\Users\\Danik\\OneDrive\\Документы\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS+CODE_IN_VS\\LW\\LW\\LW.csproj",
+      "targetGraphs": []
+    }
+  ]
 }

@@ -69,7 +69,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.403/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.404/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -346,5 +346,13 @@
         }
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Ошибка чтения файла кэша C:\\Users\\Danik\\OneDrive\\Документы\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS+CODE_IN_VS\\LW\\LW\\obj\\project.nuget.cache: '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0."
+    }
+  ]
 }
