@@ -4,7 +4,8 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <DefaultItemExcludes>$(DefaultItemExcludes);LW_40-41/**</DefaultItemExcludes>
+    <StartupObject>Lab40_41</StartupObject>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -17,6 +18,7 @@
   <ItemGroup>
     <None Include="LW_34-35\LW_34-35.cs" />
     <None Include="LW_36-37\LW_36-37.cs" />
+    <None Update="LW_40-41\books.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="books.txt" />
   </ItemGroup>
 
   <ItemGroup>

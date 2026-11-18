@@ -2,7 +2,7 @@
 using System.IO;
 using System.Windows.Forms;
 
-internal static class Program
+internal static class Lab38_39
 {
     [STAThread]
     static void Main()
