@@ -40,6 +40,7 @@ internal static class Program
             writer.Write(editor.Text);
         };
 
+        Console.WriteLine("В окне редактора нажмите «Открыть» и выберите файл .txt.");
         Application.Run(form);
     }
 }
