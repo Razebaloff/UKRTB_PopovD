@@ -1,0 +1,8 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'LW'">
+    <_Lab40Files Include="LW_40-41\LW_40-41.cs;LW_40-41\LW_40-41.csproj;LW_40-41\books.txt;LW_40-41\LW_40-41.docx" />
+    <Compile Remove="LW_40-41\**\*.cs" />
+    <None Remove="@(_Lab40Files)" />
+    <None Include="@(_Lab40Files)" Visible="true" />
+  </ItemGroup>
+</Project>
