@@ -17,4 +17,9 @@
     <None Include="LW_36-37\LW_36-37.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="CW\" />
+    <Folder Include="LW_40-41\" />
+  </ItemGroup>
+
 </Project>
