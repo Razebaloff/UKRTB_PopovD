@@ -32,7 +32,7 @@ internal static class Program
             path = dialog.FileName;
             form.Text = Path.GetFileName(path);
             save.Enabled = true;
-        };
+        };  
 
         save.Click += (sender, e) =>
         {

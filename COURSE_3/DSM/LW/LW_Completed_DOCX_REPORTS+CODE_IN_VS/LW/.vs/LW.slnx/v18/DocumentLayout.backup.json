@@ -18,21 +18,8 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 3,
           "Children": [
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "LW_38-39.cs",
-              "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_38-39\\LW_38-39.cs",
-              "RelativeDocumentMoniker": "LW\\LW_38-39\\LW_38-39.cs",
-              "ToolTip": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_38-39\\LW_38-39.cs",
-              "RelativeToolTip": "LW\\LW_38-39\\LW_38-39.cs",
-              "ViewState": "AgIAABgAAAAAAAAAAAAAACMAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-17T11:50:16.561Z",
-              "EditorCaption": ""
-            },
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{eefa5220-e298-11d0-8f78-00a0c9110057}"
@@ -47,13 +34,26 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "LW_38-39.cs",
+              "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_38-39\\LW_38-39.cs",
+              "RelativeDocumentMoniker": "LW\\LW_38-39\\LW_38-39.cs",
+              "ToolTip": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_38-39\\LW_38-39.cs",
+              "RelativeToolTip": "LW\\LW_38-39\\LW_38-39.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACIAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-17T11:50:16.561Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 1,
               "Title": "LW_36-37.cs",
               "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_36-37\\LW_36-37.cs",
               "RelativeDocumentMoniker": "LW\\LW_36-37\\LW_36-37.cs",
               "ToolTip": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_36-37\\LW_36-37.cs",
               "RelativeToolTip": "LW\\LW_36-37\\LW_36-37.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-11-17T11:36:20.66Z",
               "EditorCaption": ""
