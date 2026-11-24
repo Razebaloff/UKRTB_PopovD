@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|c:\\users\\danik\\onedrive\\\u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\github\\ukrtb_popovd\\course_3\\dsm\\lw\\lw_completed_docx_reports\u002Bcode_in_vs\\lw\\lw\\lw_38-39\\lw_38-39.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|solutionrelative:lw\\lw_38-39\\lw_38-39.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|c:\\users\\danik\\onedrive\\\u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\github\\ukrtb_popovd\\course_3\\dsm\\lw\\lw_completed_docx_reports\u002Bcode_in_vs\\lw\\lw\\xz.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|solutionrelative:lw\\xz.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|c:\\users\\danik\\onedrive\\\u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\github\\ukrtb_popovd\\course_3\\dsm\\lw\\lw_completed_docx_reports\u002Bcode_in_vs\\lw\\lw\\lw_36-37\\lw_36-37.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|solutionrelative:lw\\lw_36-37\\lw_36-37.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|c:\\users\\danik\\onedrive\\\u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\github\\ukrtb_popovd\\course_3\\dsm\\lw\\lw_completed_docx_reports\u002Bcode_in_vs\\lw\\lw\\lw_38-39\\lw_38-39.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{29A8897E-8AED-A9B5-DF2A-498AC6A061C9}|LW\\LW.csproj|solutionrelative:lw\\lw_38-39\\lw_38-39.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -35,6 +39,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "XZ.cs",
+              "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\XZ.cs",
+              "RelativeDocumentMoniker": "LW\\XZ.cs",
+              "ToolTip": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\XZ.cs",
+              "RelativeToolTip": "LW\\XZ.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAaAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-11-19T18:28:59.132Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "LW_38-39.cs",
               "DocumentMoniker": "C:\\Users\\Danik\\OneDrive\\\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u044B\\GitHub\\UKRTB_PopovD\\COURSE_3\\DSM\\LW\\LW_Completed_DOCX_REPORTS\u002BCODE_IN_VS\\LW\\LW\\LW_38-39\\LW_38-39.cs",
               "RelativeDocumentMoniker": "LW\\LW_38-39\\LW_38-39.cs",
@@ -55,7 +72,8 @@
               "RelativeToolTip": "LW\\LW_36-37\\LW_36-37.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-11-17T11:36:20.66Z"
+              "WhenOpened": "2026-11-17T11:36:20.66Z",
+              "EditorCaption": ""
             }
           ]
         }

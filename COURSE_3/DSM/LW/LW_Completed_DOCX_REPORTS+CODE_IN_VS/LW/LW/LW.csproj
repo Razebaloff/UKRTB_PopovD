@@ -18,6 +18,7 @@
   <ItemGroup>
     <Compile Remove="LW_34-35\LW_34-35.cs" />
     <Compile Remove="LW_36-37\LW_36-37.cs" />
+    <Compile Remove="LW_38-39\LW_38-39.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +28,10 @@
 
   <ItemGroup>
     <Folder Include="LW_40-41\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="LW_38-39\LW_38-39.cs" />
   </ItemGroup>
 
 </Project>
