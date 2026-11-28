@@ -108,6 +108,9 @@ namespace LP_PopovD_App
                     // Реальная сетка и кнопка «НАЗАД» — дочерние контролы
                     // Form1, не встроенный рисунок хоккейного поля.
                     break;
+                case AppScreen.Information:
+                    HeaderDrawing.Draw(g, viewport, includeSticks);
+                    break;
                 case AppScreen.Menu:
                     RinkDrawing.Draw(g);
                     if (includeControls)

@@ -1,4 +1,4 @@
 namespace LP_PopovD_App
 {
-    internal enum AppScreen { Entry, Login, Registration, Menu, Schedule }
+    internal enum AppScreen { Entry, Login, Registration, Menu, Schedule, Information }
 }

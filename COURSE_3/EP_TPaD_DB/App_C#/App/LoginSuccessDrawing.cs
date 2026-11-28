@@ -18,6 +18,7 @@ namespace LP_PopovD_App
         private readonly SnowSeed[] wind = SnowDrawing.Seeds(252, 81624);
         private readonly SnowSeed[] squall = SnowDrawing.Seeds(176, 73591);
         private readonly SnowSeed[] powder = SnowDrawing.Seeds(132, 22147);
+        private readonly LoginLightDrawing light = new();
         private readonly PointF[] glyphPoints;
         private readonly float spriteScale, nameScale;
         private readonly RectangleF letterBounds;
@@ -209,12 +210,12 @@ namespace LP_PopovD_App
             {
                 for (int i = 7; i >= 1; i--)
                 {
-                    using Pen light = new(Color.FromArgb(7 + (7 - i) * 4, 255, 255, 255), i * 1.8f)
+                    using Pen light = new(Color.FromArgb(4 + (7 - i) * 2, RinkDrawing.IceLight), i * 1.6f)
                         { LineJoin = LineJoin.Round };
                     g.DrawPath(light, path);
                 }
             }
-            using SolidBrush ink = new(halo ? Color.White : JerseyFieldDrawing.Ink);
+            using SolidBrush ink = new(halo ? RinkDrawing.IceLight : JerseyFieldDrawing.Ink);
             g.FillPath(ink, path);
             return image;
         }
@@ -345,8 +346,9 @@ namespace LP_PopovD_App
             float nameOpacity = SnowDrawing.Smooth((time - .06f) / .70f);
             if (glowStrength > .001f)
             {
-                DrawRays(g, position, grow, glowStrength, time);
-                DrawSprite(g, glow, position, grow, squash, glowStrength * .86f, alpha);
+                float extension = .70f + .30f * SnowDrawing.Smooth((time - .86f) / .42f);
+                light.Draw(g, position, glowStrength, extension, alpha);
+                DrawSprite(g, glow, position, grow, squash, glowStrength * .48f, alpha);
             }
             if (printedStrength > 0)
             {
@@ -373,76 +375,6 @@ namespace LP_PopovD_App
             g.DrawImage(image, new Rectangle(0, 0, image.Width, image.Height),
                 0, 0, image.Width, image.Height, GraphicsUnit.Pixel, alpha);
             g.Restore(state);
-        }
-
-        private static float RayNoise(int index)
-        {
-            uint value = unchecked((uint)index * 747796405u + 2891336453u);
-            value ^= value >> 16;
-            value = unchecked(value * 2246822519u);
-            value ^= value >> 13;
-            return (value & 65535u) / 65535f;
-        }
-
-        private void DrawRays(Graphics g, PointF position, float scale, float strength, float time)
-        {
-            if (glyphPoints.Length == 0 || strength <= .001f) return;
-            // Нерегулярные лучи выходят из разных точек контура букв.
-            // Каждый имеет собственные яркость, мерцание, размер и рассеяние.
-            using Pen halo = new(Color.White, 5) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen beam = new(Color.White, 1.8f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using Pen core = new(Color.White, .65f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            for (int i = 0; i < 42; i++)
-            {
-                float irregularity = RayNoise(i + 11);
-                float phase = RayNoise(i + 519) * MathF.Tau;
-                PointF contour = glyphPoints[(int)(RayNoise(i + 231) * (glyphPoints.Length - 1))];
-                float angle = i * MathF.Tau / 42f +
-                    (irregularity - .5f) * .15f + MathF.Sin(time * 3.4f + phase) * .016f;
-                float ux = MathF.Cos(angle), uy = MathF.Sin(angle);
-                float x = position.X + contour.X * scale;
-                float y = position.Y + contour.Y * scale;
-                float reachX = Math.Abs(ux) < .0001f ? 10000f : (ux > 0 ? 1600 - x : -x) / ux;
-                float reachY = Math.Abs(uy) < .0001f ? 10000f : (uy > 0 ? 800 - y : -y) / uy;
-                float edgeDistance = Math.Max(0, Math.Min(reachX, reachY));
-                float shimmer = .82f + .18f * MathF.Sin(time * (5 + irregularity * 4) + phase);
-                float lengthFactor = i % 6 == 0 ? 1f : .32f + irregularity * .61f;
-                float extend = SnowDrawing.Smooth((time - .85f) / .26f);
-                float length = edgeDistance * lengthFactor * extend;
-                if (length < 1) continue;
-                float amount = strength * shimmer * (.47f + .53f * irregularity);
-                PointF end = new(x + ux * length, y + uy * length);
-
-                halo.Color = Color.FromArgb((int)(22 * amount), 218, 243, 255);
-                halo.Width = 3.5f + 2.4f * irregularity;
-                g.DrawLine(halo, x, y, end.X, end.Y);
-
-                // Основная полупрозрачная нить, более яркая у источника.
-                for (int segment = 0; segment < 4; segment++)
-                {
-                    float f0 = segment / 4f, f1 = (segment + 1) / 4f;
-                    float light = 1 - segment * .21f;
-                    beam.Color = Color.FromArgb((int)(103 * amount * light), 245, 252, 255);
-                    beam.Width = 1.1f + (1 - f0) * .7f;
-                    g.DrawLine(beam, x + ux * length * f0, y + uy * length * f0,
-                        x + ux * length * f1, y + uy * length * f1);
-                }
-
-                core.Color = Color.FromArgb((int)(165 * amount), 255, 255, 255);
-                g.DrawLine(core, x, y, x + ux * length * (.50f + .25f * irregularity),
-                    y + uy * length * (.50f + .25f * irregularity));
-
-                // Редкие вторичные рассеянные лучи, с небольшим отклонением.
-                if (i % 3 == 0)
-                {
-                    float deflection = (i % 2 == 0 ? 1 : -1) * (.055f + irregularity * .065f);
-                    float ax = MathF.Cos(angle + deflection), ay = MathF.Sin(angle + deflection);
-                    float branch = length * (.24f + irregularity * .17f);
-                    float sx = x + ux * length * .13f, sy = y + uy * length * .13f;
-                    core.Color = Color.FromArgb((int)(49 * amount), 229, 248, 255);
-                    g.DrawLine(core, sx, sy, sx + ax * branch, sy + ay * branch);
-                }
-            }
         }
 
         private static void DrawSnowflake(Graphics g, Pen pen, float x, float y, float size, int alpha)
@@ -763,6 +695,7 @@ namespace LP_PopovD_App
 
         public void Dispose()
         {
+            light.Dispose();
             overlayGraphics.Dispose(); overlayBuffer.Dispose();
             reducedBefore.Dispose(); reducedClean.Dispose();
             before.Dispose(); clean.Dispose(); letters.Dispose(); glow.Dispose(); printed.Dispose();

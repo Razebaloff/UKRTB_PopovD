@@ -52,6 +52,7 @@ namespace LP_PopovD_App
                 using (Graphics g = Graphics.FromImage(background))
                 {
                     StickFeedbackDrawing.Draw(g, ClientSize);
+                    DrawTitleGlow(g, ClientRectangle);
                     // Неподвижные элементы остаются на исходном экране.
                     Control[] fixedControls = registration ? new Control[] { submitButton, backButton }
                         : new Control[] { submitButton, backButton, rememberCheck };

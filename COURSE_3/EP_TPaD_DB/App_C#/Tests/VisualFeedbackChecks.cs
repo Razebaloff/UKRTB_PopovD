@@ -73,7 +73,7 @@ internal static class VisualFeedbackChecks
                 }
                 finally { image.UnlockBits(data); }
             }
-            byte[] first = Frame(0), later = Frame(3);
+            byte[] first = Frame(1.75f), later = Frame(5.25f);
             Check(!first.AsSpan().SequenceEqual(later), "Свечение плавно меняет общую яркость.");
             int peakFirst = 0, peakLater = 0;
             for (int i = 3; i < first.Length; i += 4)
@@ -81,12 +81,16 @@ internal static class VisualFeedbackChecks
                 peakFirst = Math.Max(peakFirst, first[i]);
                 peakLater = Math.Max(peakLater, later[i]);
             }
-            int visibleWhite = 0;
+            int iceFace = 0, pureWhite = 0;
             for (int i = 0; i < first.Length; i += 4)
-                if (first[i + 3] > 210 && first[i] >= 245 && first[i + 1] >= 245 && first[i + 2] >= 245)
-                    visibleWhite++;
-            Check(visibleWhite > 100, "Подсветка содержит заметную белую основу букв, а не только слабый внешний ореол.");
-            Check(Math.Abs(peakFirst - peakLater) >= 8, "Общая пульсация белого свечения видима.");
+            {
+                if (first[i + 3] < 195) continue;
+                if (first[i] > first[i + 1] && first[i + 1] > first[i + 2] && first[i + 2] > 190) iceFace++;
+                if (first[i] >= 245 && first[i + 1] >= 245 && first[i + 2] >= 245) pureWhite++;
+            }
+            Check(iceFace > 100 && pureWhite == 0, "Даже в максимуме буквы сохраняют ледяной оттенок.");
+            Check(peakFirst <= 230 && peakFirst - peakLater is >= 20 and <= 40,
+                "Плавная пульсация сохраняет видимость фоновой краски.");
             bool uniform = peakFirst > 0 && peakLater > 0;
             for (int i = 3; i < first.Length && uniform; i += 4)
                 uniform = Math.Abs(first[i] * peakLater - later[i] * peakFirst) <=
@@ -94,6 +98,44 @@ internal static class VisualFeedbackChecks
             Check(uniform, "Все участки ореола меняют яркость вместе, без движущегося светового пятна.");
             Check(ReferenceEquals(halo, glowType.GetField("halo", Hidden)!.GetValue(glow)),
                 "Ореол не создаётся повторно на каждом кадре.");
+        }
+
+        Type success = app.GetType("LP_PopovD_App.LoginSuccessDrawing", true)!;
+        Bitmap LightFrame(string login, bool registration)
+        {
+            Size size = new(640, 360);
+            using IDisposable effect = (IDisposable)Activator.CreateInstance(success, Hidden, null,
+                new object[] { size, new Bitmap(size.Width, size.Height), new Bitmap(size.Width, size.Height),
+                    login, registration }, CultureInfo.InvariantCulture)!;
+            return (Bitmap)success.GetMethod("Render", Hidden)!.Invoke(effect, new object[] { 1350f })!;
+        }
+        foreach (bool registration in new[] { false, true })
+        {
+            using Bitmap shortName = LightFrame("Я", registration);
+            using Bitmap longName = LightFrame("Хоккеист_с_длинным_логином", registration);
+            bool sameRays = true, differentLetters = false;
+            for (int y = 0; y < shortName.Height; y += 3)
+                for (int x = 0; x < shortName.Width; x += 3)
+                {
+                    if (shortName.GetPixel(x, y) == longName.GetPixel(x, y)) continue;
+                    if (x < 210 || x > 430) sameRays = false;
+                    else differentLetters = true;
+                }
+            Check(sameRays && differentLetters, "За пределами логина свет не зависит от ширины и контуров букв.");
+        }
+
+        using Control info = (Control)Activator.CreateInstance(app.GetType("LP_PopovD_App.InformationPanel", true)!, nonPublic: true)!;
+        foreach (int width in new[] { 658, 1316, 658 })
+        {
+            info.GetType().GetMethod("SetSceneBounds", Hidden)!.Invoke(info,
+                new object[] { new Rectangle(0, 0, width, width * 385 / 1232) });
+            info.PerformLayout();
+            foreach (Label field in info.Controls.OfType<Label>())
+            {
+                Size measured = TextRenderer.MeasureText(field.Text, field.Font);
+                Check(field.Width >= measured.Width && field.Height >= measured.Height,
+                    $"Текст раздела «Информация» не помещается при ширине панели {width}: {field.Text}");
+            }
         }
         return checks;
     }

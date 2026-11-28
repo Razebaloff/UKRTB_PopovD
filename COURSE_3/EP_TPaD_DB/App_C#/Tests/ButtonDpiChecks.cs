@@ -61,7 +61,7 @@ internal static class ButtonDpiChecks
         using (Graphics graphics = Graphics.FromImage(image))
         {
             graphics.PageUnit = GraphicsUnit.Pixel;
-            if (button.Region != null) graphics.SetClip(button.Region);
+            if (button.Region != null) graphics.Clip = button.Region;
             using PaintEventArgs args = new(graphics, button.ClientRectangle);
             paint.Invoke(button, new object[] { args });
         }

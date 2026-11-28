@@ -19,10 +19,9 @@ namespace LP_PopovD_App
 
         internal static bool TryGetScreen(string argument, out AppScreen screen)
         {
-            // Расписание — интерактивный контрол. Не экспортируем
-            // пустой лёд под видом готовой таблицы через CLI 32K.
+            // Экраны с нативными панелями сохраняются через F12 в самой форме.
             foreach (AppScreen candidate in Enum.GetValues<AppScreen>())
-                if (candidate != AppScreen.Schedule &&
+                if (candidate is not (AppScreen.Schedule or AppScreen.Information) &&
                     string.Equals(argument, Argument(candidate), StringComparison.Ordinal))
                 {
                     screen = candidate;

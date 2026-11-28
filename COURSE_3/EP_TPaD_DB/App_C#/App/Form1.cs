@@ -14,7 +14,7 @@ namespace LP_PopovD_App
         private Bitmap? sceneCache, transitionFrom, transitionTo, stickBackdrop;
         private PointF transitionOrigin;
         private TransitionFrameRenderer? transitionRenderer;
-        private bool revealOnly, focusCodeAfterTransition, scheduleFocus, exporting;
+        private bool revealOnly, focusCodeAfterTransition, focusInformationOnReturn, exporting;
         private readonly Stopwatch transitionClock = new(), stickClock = Stopwatch.StartNew(),
             successClock = new();
         private readonly System.Windows.Forms.Timer transitionTimer, stickTimer, successTimer;
@@ -30,6 +30,8 @@ namespace LP_PopovD_App
         private readonly CapsuleInput loginInput, passwordInput, emailInput, codeInput;
         private readonly RememberCheckBox rememberCheck;
         private readonly CapsuleButton submitButton, backButton;
+        private readonly InformationPanel informationPanel;
+        private readonly CapsuleButton mapButton, siteButton;
         private readonly ScheduleBoard scheduleBoard;
         private AppScreen scheduleReturnScreen = AppScreen.Entry;
         private string authStatus = "", rememberedLogin = "", successLogin = "";
@@ -38,6 +40,13 @@ namespace LP_PopovD_App
         // Имя вошедшего пользователя хранится в памяти текущей сессии.
         // Регистрация устанавливает его после записи аккаунта в SQLite.
         internal string? AuthenticatedLogin => authenticatedLogin;
+
+        private AppScreen BackTarget => screen switch
+        {
+            AppScreen.Information => AppScreen.Menu,
+            AppScreen.Schedule => scheduleReturnScreen,
+            _ => AppScreen.Entry
+        };
 
         private bool Busy => loading || preparingAction || stickAnimation.Active || transitionFrom != null || loginSuccess != null || verificationReveal != null;
         private SceneSurfaceKey CurrentKey => new(screen,
@@ -90,10 +99,14 @@ namespace LP_PopovD_App
             submitButton = new CapsuleButton { Primary = true, TabIndex = 4 };
             backButton = new CapsuleButton(crackOnHover: true)
             { Text = "НАЗАД", TabIndex = 5, AccessibleName = "Назад" };
+            informationPanel = new InformationPanel();
+            mapButton = new CapsuleButton { Text = "ОТКРЫТЬ В ЯНДЕКС КАРТАХ", AccessibleName = "Открыть центр в Яндекс Картах", Primary = true };
+            siteButton = new CapsuleButton { Text = "САЙТ ЦЕНТРА", AccessibleName = "Открыть сайт центра" };
             scheduleBoard = new ScheduleBoard { TabIndex = 0 };
             scheduleBoard.OverlayPaint += PaintScheduleCracks;
             Controls.Add(scheduleBoard);
-            foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton })
+            foreach (Control control in new Control[] { loginInput, passwordInput, emailInput, codeInput, rememberCheck, submitButton, backButton,
+                informationPanel, mapButton, siteButton })
             {
                 control.Visible = false;
                 Controls.Add(control);
@@ -273,7 +286,8 @@ namespace LP_PopovD_App
                 AppScreen? target = button == entryButton ? AppScreen.Login :
                     button == registrationButton ? AppScreen.Registration :
                     button == entryScheduleButton || button == scheduleButton || button == rentButton ? AppScreen.Schedule :
-                    button == backButton ? (screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry) : null;
+                    button == informationButton ? AppScreen.Information :
+                    button == backButton ? BackTarget : null;
                 if (target.HasValue) await cache.GetAsync(new(target.Value));
                 if (button == submitButton && screen == AppScreen.Login)
                 {
@@ -306,6 +320,8 @@ namespace LP_PopovD_App
                 Action action = () => { };
                 if (target.HasValue) action = () => _ = NavigateAsync(target.Value, Center(button));
                 else if (button == submitButton) action = () => _ = SubmitAuthAsync();
+                else if (button == mapButton) action = () => OpenInformationLink(InformationPanel.MapUrl);
+                else if (button == siteButton) action = () => OpenInformationLink(InformationPanel.SiteUrl);
                 feedbackSource = button;
                 HideScreenControls();
                 stickAnimation.TryBegin(action);
@@ -315,6 +331,16 @@ namespace LP_PopovD_App
             catch (OperationCanceledException) { }
             catch (Exception error) { ShowRenderError(error, cache); ShowScreenControls(); }
             finally { if (cache == surfaces) preparingAction = false; }
+        }
+
+        private void OpenInformationLink(string url)
+        {
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                MessageBox.Show(this, $"Откройте ссылку в браузере вручную:\n{url}",
+                    "Не удалось открыть ссылку", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void CancelButtonAnimation()
@@ -372,18 +398,7 @@ namespace LP_PopovD_App
             if (screen is not (AppScreen.Menu or AppScreen.Schedule) && !withoutSticks &&
                 sourceBounds.IntersectsWith(StickFeedbackDrawing.PixelBounds(ClientSize)))
                 StickFeedbackDrawing.Draw(graphics, ClientSize);
-            if (screen != AppScreen.Schedule)
-            {
-                bool menu = screen == AppScreen.Menu;
-                if (titleGlow == null || titleGlow.Size != ClientSize || titleGlowMenu != menu)
-                {
-                    titleGlow?.Dispose();
-                    titleGlow = new TitleGlowDrawing(ClientSize, menu);
-                    titleGlowMenu = menu;
-                }
-                if (sourceBounds.IntersectsWith(titleGlow.Bounds))
-                    titleGlow.Draw(graphics, FrostHoverAnimation.Seconds);
-            }
+            if (screen != AppScreen.Schedule) DrawTitleGlow(graphics, sourceBounds);
             if (authStatus.Length > 0 && screen is AppScreen.Login or AppScreen.Registration)
             {
                 RectangleF canvas = RinkDrawing.GetCanvasBounds(ClientSize);
@@ -396,6 +411,19 @@ namespace LP_PopovD_App
                     screen == AppScreen.Login ? JerseyDrawing.LoginStatusBounds : JerseyDrawing.StatusBounds, format);
             }
             graphics.Restore(saved);
+        }
+
+        private void DrawTitleGlow(Graphics graphics, Rectangle sourceBounds)
+        {
+            bool menu = screen == AppScreen.Menu;
+            if (titleGlow == null || titleGlow.Size != ClientSize || titleGlowMenu != menu)
+            {
+                titleGlow?.Dispose();
+                titleGlow = new TitleGlowDrawing(ClientSize, menu);
+                titleGlowMenu = menu;
+            }
+            if (sourceBounds.IntersectsWith(titleGlow.Bounds))
+                titleGlow.Draw(graphics, FrostHoverAnimation.Seconds);
         }
 
         private void RefreshInputFabric()
@@ -458,6 +486,14 @@ namespace LP_PopovD_App
             }
             rememberCheck.SetScale(scale);
             rememberCheck.Bounds = ToPixels(JerseyDrawing.RememberBounds);
+            if (screen == AppScreen.Information)
+            {
+                informationPanel.SetSceneBounds(ToPixels(InformationPanel.SceneBounds));
+                mapButton.SetScale(scale);
+                siteButton.SetScale(scale);
+                mapButton.Bounds = ToPixels(InformationPanel.MapBounds);
+                siteButton.Bounds = ToPixels(InformationPanel.SiteBounds);
+            }
             // Полноэкранное расписание без рамки поля и пустых полей
             // вокруг таблицы: занимает именно клиентскую область формы.
             scheduleBoard.Bounds = ClientRectangle;
@@ -476,7 +512,7 @@ namespace LP_PopovD_App
                     Math.Max(12, (int)(ClientSize.Height * .0578f)),
                     Math.Max(96, (int)(ClientSize.Width * .108f)),
                     Math.Max(36, (int)(ClientSize.Height * .0645f)))
-                : ToPixels(screen == AppScreen.Menu ? RinkDrawing.MenuBackBounds : JerseyDrawing.BackBounds);
+                : ToPixels(screen is AppScreen.Menu or AppScreen.Information ? RinkDrawing.MenuBackBounds : JerseyDrawing.BackBounds);
         }
 
         private void HideScreenControls()
@@ -494,6 +530,7 @@ namespace LP_PopovD_App
             bool auth = screen is AppScreen.Login or AppScreen.Registration;
             entryButton.Visible = registrationButton.Visible = entryScheduleButton.Visible = entry;
             rentButton.Visible = profileButton.Visible = informationButton.Visible = scheduleButton.Visible = menu;
+            informationPanel.Visible = mapButton.Visible = siteButton.Visible = screen == AppScreen.Information;
             scheduleBoard.Visible = schedule;
             if (schedule)
             {
@@ -538,6 +575,12 @@ namespace LP_PopovD_App
                 scheduleBoard.TabIndex = 0;
                 backButton.TabIndex = 1;
             }
+            else if (screen == AppScreen.Information)
+            {
+                mapButton.TabIndex = 0;
+                siteButton.TabIndex = 1;
+                backButton.TabIndex = 2;
+            }
             else
             {
                 loginInput.TabIndex = 0;
@@ -558,7 +601,7 @@ namespace LP_PopovD_App
             {
                 // CapsuleInput — это контейнер. Остановка по Tab
                 // требуется только на его вложенном TextBox.
-                control.TabStop = control.Visible && control is not CapsuleInput;
+                control.TabStop = control.Visible && control is not (CapsuleInput or InformationPanel);
             }
         }
 
@@ -573,6 +616,8 @@ namespace LP_PopovD_App
                 { rentButton, profileButton, informationButton, scheduleButton, backButton },
             AppScreen.Schedule => new Control[]
                 { scheduleBoard, backButton },
+            AppScreen.Information => new Control[]
+                { mapButton, siteButton, backButton },
             AppScreen.Registration when accounts.RegistrationCodeRequested => new Control[]
                 { loginInput, passwordInput, emailInput, codeInput, submitButton, backButton },
             AppScreen.Registration => new Control[]
@@ -675,7 +720,7 @@ namespace LP_PopovD_App
             finally { changingValues = false; }
         }
 
-        private async Task NavigateAsync(AppScreen target, PointF origin, bool focusSchedule = false, Bitmap? suppliedBefore = null)
+        private async Task NavigateAsync(AppScreen target, PointF origin, Bitmap? suppliedBefore = null)
         {
             if (Busy || surfaces == null || screen == target) { suppliedBefore?.Dispose(); return; }
             SceneSurfaceCache cache = surfaces;
@@ -697,10 +742,10 @@ namespace LP_PopovD_App
                     scheduleBoard.BookingEnabled = screen == AppScreen.Menu;
                     if (!string.IsNullOrWhiteSpace(authenticatedLogin)) scheduleBoard.SuggestedTenant = authenticatedLogin;
                 }
+                focusInformationOnReturn = target == AppScreen.Menu && screen == AppScreen.Information;
                 screen = target;
                 if (target == AppScreen.Entry)
                     authenticatedLogin = null;
-                scheduleFocus = focusSchedule;
                 focusCodeAfterTransition = false;
                 if (target == AppScreen.Login)
                 {
@@ -735,7 +780,8 @@ namespace LP_PopovD_App
             DropTransition();
             ShowScreenControls();
             if (screen == AppScreen.Entry) entryButton.Focus();
-            else if (screen == AppScreen.Menu) { if (scheduleFocus) scheduleButton.Focus(); else rentButton.Focus(); }
+            else if (screen == AppScreen.Menu) (focusInformationOnReturn ? informationButton : rentButton).Focus();
+            else if (screen == AppScreen.Information) mapButton.Focus();
             else if (screen == AppScreen.Schedule) scheduleBoard.Focus();
             else if (focusCodeAfterTransition) { codeInput.FocusInput(); focusCodeAfterTransition = false; }
             else if (screen is AppScreen.Login or AppScreen.Registration) loginInput.FocusInput();
@@ -957,7 +1003,10 @@ namespace LP_PopovD_App
             try
             {
                 using (Graphics graphics = Graphics.FromImage(clean))
+                {
                     StickFeedbackDrawing.Draw(graphics, ClientSize);
+                    DrawTitleGlow(graphics, ClientRectangle);
+                }
                 loginSuccess = new LoginSuccessDrawing(ClientSize, before, clean,
                     successLogin, registration);
             }
@@ -1050,8 +1099,7 @@ namespace LP_PopovD_App
                 }
                 else if (transitionFrom != null || verificationReveal != null) FinishTransition();
                 else if (screen != AppScreen.Entry)
-                    _ = NavigateAsync(screen == AppScreen.Schedule ? scheduleReturnScreen : AppScreen.Entry,
-                        Center(backButton));
+                    _ = NavigateAsync(BackTarget, Center(backButton));
                 else Close();
                 e.Handled = e.SuppressKeyPress = true;
             }
@@ -1072,16 +1120,14 @@ namespace LP_PopovD_App
         {
             if (exporting || Busy) return;
             AppScreen exportScreen = screen;
-            if (exportScreen == AppScreen.Schedule)
+            if (exportScreen is AppScreen.Schedule or AppScreen.Information)
             {
-                // В расписании есть живой дочерний контрол: сохраняем
-                // действительно видимую недельную таблицу, а не только
-                // ледовый фон из 32K-экспортера статичных экранов.
+                string fileName = exportScreen == AppScreen.Schedule ? "Расписание_занятий" : "Информация_о_центре";
                 using SaveFileDialog screenshot = new()
                 {
-                    Title = "Сохранить расписание в PNG (размер текущего окна)",
+                    Title = "Сохранить экран в PNG (размер текущего окна)",
                     Filter = "PNG без потерь (*.png)|*.png",
-                    FileName = "Расписание_занятий.png",
+                    FileName = fileName + ".png",
                     DefaultExt = "png",
                     AddExtension = true,
                     OverwritePrompt = true
@@ -1095,7 +1141,7 @@ namespace LP_PopovD_App
                 }
                 catch (Exception error)
                 {
-                    MessageBox.Show(this, error.Message, "Не удалось сохранить расписание",
+                    MessageBox.Show(this, error.Message, "Не удалось сохранить экран",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 finally { exporting = false; }

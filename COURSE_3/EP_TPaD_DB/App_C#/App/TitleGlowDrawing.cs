@@ -4,12 +4,9 @@ using System.Runtime.InteropServices;
 
 namespace LP_PopovD_App
 {
-    // Геометрия букв и мягкий ореол строятся один раз на размер окна.
-    // Белая светящаяся основа букв и мягкий ореол кэшируются вместе.
-    // В кадре плавно меняется общая яркость без движения светового пятна.
+    // Буквы и рассеянный свет кэшируются вместе. В кадре меняется только прозрачность.
     internal sealed class TitleGlowDrawing : IDisposable
     {
-        private readonly GraphicsPath glyphs;
         private readonly Bitmap halo;
         internal Size Size { get; }
         internal Rectangle Bounds { get; }
@@ -17,7 +14,7 @@ namespace LP_PopovD_App
         internal TitleGlowDrawing(Size size, bool menu)
         {
             Size = size;
-            glyphs = menu ? RinkTypography.CreateMenuTitlePath() : HeaderDrawing.CreateTitlePath();
+            using GraphicsPath glyphs = menu ? RinkTypography.CreateMenuTitlePath() : HeaderDrawing.CreateTitlePath();
             RectangleF canvas = RinkDrawing.GetCanvasBounds(size);
             float scale = canvas.Width / RinkDrawing.Width;
             using Matrix fit = new(scale, 0, 0, scale, canvas.X, canvas.Y);
@@ -41,13 +38,12 @@ namespace LP_PopovD_App
             byte[] alpha = pixels.Select(color => (byte)((uint)color >> 24)).ToArray();
             byte[] diffuse = Blur(Blur(alpha, mask.Width, mask.Height, radius), mask.Width, mask.Height, radius);
             byte[] close = Blur(alpha, mask.Width, mask.Height, Math.Max(1, (int)MathF.Ceiling(1.5f * scale)));
+            Color reflectedLight = Color.FromArgb(207, 228, 240);
             for (int i = 0; i < pixels.Length; i++)
             {
-                // Яркое ближнее свечение и широкое рассеяние вокруг букв.
-                int nearLight = Math.Min(245, close[i] * 3 / 2);
-                int farLight = Math.Min(195, diffuse[i] * 2);
-                int a = (nearLight + farLight - nearLight * farLight / 255) * (255 - alpha[i]) / 255;
-                pixels[i] = a << 24 | a << 16 | a << 8 | a;
+                int a = (close[i] * 154 + diffuse[i] * 88) / 255 * (255 - alpha[i]) / 255;
+                pixels[i] = a << 24 | (reflectedLight.R * a / 255) << 16 |
+                    (reflectedLight.G * a / 255) << 8 | reflectedLight.B * a / 255;
             }
             halo = new Bitmap(mask.Width, mask.Height, PixelFormat.Format32bppPArgb);
             halo.SetResolution(96, 96);
@@ -60,11 +56,11 @@ namespace LP_PopovD_App
                 light.SmoothingMode = SmoothingMode.AntiAlias;
                 light.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 // Тонкая холодная грань сохраняет читаемость на светлом льду.
-                using Pen edge = new(Color.FromArgb(190, 24, 51, 71), Math.Max(1.2f, 1.05f * scale))
+                using Pen edge = new(Color.FromArgb(220, 32, 65, 84), Math.Max(1.65f, 1.9f * scale))
                     { LineJoin = LineJoin.Round };
                 light.DrawPath(edge, glyphs);
-                using SolidBrush white = new(Color.White);
-                light.FillPath(white, glyphs);
+                using SolidBrush face = new(Color.FromArgb(224, 237, 244));
+                light.FillPath(face, glyphs);
             }
         }
 
@@ -106,7 +102,7 @@ namespace LP_PopovD_App
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 // Одна интенсивность для всего слоя. Положение и форма
                 // света неподвижны; нет бегущего блика или светового пятна.
-                float intensity = .92f + .08f * MathF.Sin(seconds * 1.25f);
+                float intensity = .835f + .06f * MathF.Sin(seconds * .9f);
                 using ImageAttributes opacity = new();
                 opacity.SetColorMatrix(new ColorMatrix { Matrix33 = intensity });
                 g.DrawImage(halo, Bounds, 0, 0, halo.Width, halo.Height, GraphicsUnit.Pixel, opacity);
@@ -114,6 +110,6 @@ namespace LP_PopovD_App
             finally { g.Restore(state); }
         }
 
-        public void Dispose() { glyphs.Dispose(); halo.Dispose(); }
+        public void Dispose() => halo.Dispose();
     }
 }
